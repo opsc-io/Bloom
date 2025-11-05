@@ -37,6 +37,56 @@ Create an open-source platform inspired by Alma and Headway, offering:
 - HIPAA-aware realtime messaging with moderation, audit trails, and optional ML assistance.
 - Extensible integrations: Zoom/Google Meet for telehealth, Stripe for payments, Optum for claims.
 
+## 1. Prisma migration (10-step plan)
+
+This project is tracking a planned migration from TypeORM to Prisma. The high-level 10-step plan is maintained in the repo TODOs and reproduced here for visibility so contributors can follow a single source of truth.
+
+1.1 Prep and safety
+
+- Create a branch `feature/prisma-migration` (we use `feature/prisma-migration-1.1` for the initial POC).
+- Keep TypeORM in place while migrating incrementally. Back up production DB and test migrations in staging before deploying to production.
+
+1.2 Install Prisma & initialize
+
+- Install `prisma` (dev) and `@prisma/client` (runtime).
+- Run `npx prisma init` to create the `prisma/` folder and initial config.
+
+1.3 Create initial Prisma schema
+
+- Prefer `npx prisma db pull` to introspect the existing database and generate `schema.prisma` for the current schema.
+- Optionally author `schema.prisma` by hand when restructuring models.
+
+1.4 Generate client
+
+- Run `npx prisma generate` to create the Prisma Client.
+- Add a singleton client at `src/lib/prisma.ts` for easy import across services.
+
+1.5 Add Prisma side-by-side
+
+- Use Prisma alongside TypeORM. Implement small Prisma-based services first (start with `User` and `Role`).
+
+1.6 Convert models incrementally (POC)
+
+- Convert `User` and `Role` as a proof-of-concept. Update a small set of tests to use Prisma (SQLite for test runs).
+
+1.7 Data migrations and syncing
+
+- If you modify schema, use `prisma migrate dev` locally to generate migrations. For production deploys run `prisma migrate deploy` or apply SQL migration scripts in a controlled window.
+
+1.8 Replace TypeORM-specific features
+
+- Reimplement TypeORM subscribers, entity listeners, and lifecycle hooks as application-level hooks or Prisma middleware. Rewrite custom repositories as small service functions around the Prisma client.
+
+1.9 Full switch & cleanup
+
+- Once all code uses Prisma, remove TypeORM dependencies, config, and unused entity files. Update CI and deployment manifests to run Prisma migrations and generate the client.
+
+1.10 Tests & verification
+
+- Run the full test suite, add integration tests for migrated paths, and perform a smoke test against staging data. Document the migration runbook and rollback steps.
+
+_This 10-step plan is also present in the project todo list. If you'd like, I can implement the initial POC (install/init Prisma and convert `User`/`Role`) on the `feature/prisma-migration-1.1` branch._
+
 ## High-level epics & features
 
 ### 1.1. User & Role Management (Backend)
