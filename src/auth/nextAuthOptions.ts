@@ -3,6 +3,7 @@ import GoogleProvider from 'next-auth/providers/google';
 import FacebookProvider from 'next-auth/providers/facebook';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import { findUserByEmail } from '../services/userService';
+import { checkRate } from '../lib/rateLimiter';
 import { signup, login } from '../services/authService';
 import { linkProvider } from '../services/providerService';
 
@@ -18,6 +19,14 @@ export const authOptions: NextAuthOptions = {
         if (!credentials) return null;
         try {
           const { email, password } = credentials as any;
+          // Rate-limit credential login attempts per email to prevent brute-force.
+          const loginLimit = parseInt(process.env.LOGIN_RATE_LIMIT ?? '5', 10);
+          const loginWindow = parseInt(process.env.LOGIN_RATE_WINDOW ?? '60', 10);
+          const rl = await checkRate(`login:email:${email}`, loginLimit, loginWindow);
+          if (!rl.allowed) {
+            // Too many attempts
+            return null;
+          }
           const res = await login(email, password);
           // login returns { token, user }
           return res.user as any;

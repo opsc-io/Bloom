@@ -13,6 +13,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+  "nodemailer": "^7.0.10",
     "@simplewebauthn/server": "^13.2.2",
     "bcrypt": "^5.1.0",
     "cors": "^2.8.5",

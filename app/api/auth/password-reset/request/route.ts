@@ -7,6 +7,13 @@ export async function POST(req: Request) {
     const email = body?.email;
     if (!email) return NextResponse.json({ error: 'Missing email' }, { status: 400 });
 
+    // Rate-limit password-reset requests per email to avoid spam
+    const { checkRate } = await import('../../../../../src/lib/rateLimiter');
+    const reqLimit = parseInt(process.env.PASSWORD_RESET_REQUEST_LIMIT ?? '3', 10);
+    const reqWindow = parseInt(process.env.PASSWORD_RESET_REQUEST_WINDOW ?? '3600', 10);
+    const rlr = await checkRate(`pwdreq:email:${email}`, reqLimit, reqWindow);
+    if (!rlr.allowed) return NextResponse.json({ ok: true });
+
     const res = await generateResetTokenForEmail(email);
     if (!res) {
       // Do not reveal whether an account exists; return 200 to avoid account enumeration.

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { getToken } from 'next-auth/jwt';
 import bcrypt from 'bcrypt';
 import { setPassword as setUserPassword, findUserById } from '../../../../src/services/userService';
+import { checkRate } from '../../../../src/lib/rateLimiter';
 
 const SALT_ROUNDS = 10;
 
@@ -18,6 +19,11 @@ export async function POST(req: Request) {
     }
 
     const userId = token.sub as string;
+  // Rate-limit password change attempts per user
+  const pwdLimit = parseInt(process.env.PASSWORD_CHANGE_RATE_LIMIT ?? '5', 10);
+  const pwdWindow = parseInt(process.env.PASSWORD_CHANGE_RATE_WINDOW ?? '60', 10);
+  const rl = await checkRate(`pwdchange:user:${userId}`, pwdLimit, pwdWindow);
+  if (!rl.allowed) return NextResponse.json({ error: 'Too many attempts' }, { status: 429 });
     const user = await findUserById(userId);
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
 
