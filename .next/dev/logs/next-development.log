@@ -1,9 +1,0 @@
-[00:00:00.646] Server  LOG      ✓ Ready in 447ms
-[00:00:04.814] Browser INFO    %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
-[00:00:24.599] Server  ERROR    ⨯ ReferenceError: Cannot access 'User' before initialization
-[00:01:13.106] Server  ERROR    ⨯ ReferenceError: Cannot access 'User' before initialization
-[00:01:13.124] Browser ERROR   [next-auth][error][CLIENT_FETCH_ERROR] 
-https://next-auth.js.org/errors#client_fetch_error Unexpected token '<', "<!DOCTYPE "... is not valid JSON {"error":{"message":"Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON","name":"SyntaxError","stack":"SyntaxError: Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON"},"message":"Unexpected token '<', \"<!DOCTYPE \"... is not valid JSON","url":"/api/auth/providers"}
-[00:01:13.174] Server  ERROR    ⨯ ReferenceError: Cannot access 'User' before initialization
-[00:01:13.201] Server  ERROR    ⨯ ReferenceError: Cannot access 'User' before initialization
-[00:01:13.338] Browser ERROR   uncaughtError: ReferenceError: Cannot access 'User' before initialization

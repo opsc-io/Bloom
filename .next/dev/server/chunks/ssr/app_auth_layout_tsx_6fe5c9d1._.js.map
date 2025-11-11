@@ -1,6 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///Users/varad/Projects/OPSC/app/auth/layout.tsx"],"sourcesContent":["import React from 'react';\n\nexport default function AuthLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <div className=\"flex items-center justify-center min-h-screen\">\n      <div className=\"w-full max-w-md p-6 bg-base-100 rounded-lg shadow\">\n        {children}\n      </div>\n    </div>\n  );\n}\n"],"names":[],"mappings":";;;;;;AAEe,SAAS,WAAW,EAAE,QAAQ,EAAiC;IAC5E,qBACE,8OAAC;QAAI,WAAU;kBACb,cAAA,8OAAC;YAAI,WAAU;sBACZ;;;;;;;;;;;AAIT","debugId":null}}]
-}

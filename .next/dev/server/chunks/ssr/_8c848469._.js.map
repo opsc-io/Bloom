@@ -1,7 +1,0 @@
-{
-  "version": 3,
-  "sources": [],
-  "sections": [
-    {"offset": {"line": 4, "column": 0}, "map": {"version":3,"sources":["file:///Users/varad/Projects/OPSC/app/layout.tsx"],"sourcesContent":["import './globals.css';\nimport React from 'react';\n\nexport const metadata = {\n  title: 'Therapy Practice Platform',\n  description: 'Platform for therapists to manage practices',\n};\n\nexport default function RootLayout({ children }: { children: React.ReactNode }) {\n  return (\n    <html lang=\"en\">\n      <body>\n        <div className=\"min-h-screen bg-base-200\">\n          <main className=\"container mx-auto p-4\">{children}</main>\n        </div>\n      </body>\n    </html>\n  );\n}\n"],"names":[],"mappings":";;;;;;;;;AAGO,MAAM,WAAW;IACtB,OAAO;IACP,aAAa;AACf;AAEe,SAAS,WAAW,EAAE,QAAQ,EAAiC;IAC5E,qBACE,8OAAC;QAAK,MAAK;kBACT,cAAA,8OAAC;sBACC,cAAA,8OAAC;gBAAI,WAAU;0BACb,cAAA,8OAAC;oBAAK,WAAU;8BAAyB;;;;;;;;;;;;;;;;;;;;;AAKnD","debugId":null}},
-    {"offset": {"line": 51, "column": 0}, "map": {"version":3,"sources":["file:///Users/varad/Projects/OPSC/node_modules/next/src/server/route-modules/app-page/vendored/rsc/react-jsx-dev-runtime.ts"],"sourcesContent":["module.exports = (\n  require('../../module.compiled') as typeof import('../../module.compiled')\n).vendored['react-rsc']!.ReactJsxDevRuntime\n"],"names":["module","exports","require","vendored","ReactJsxDevRuntime"],"mappings":"AAAAA,OAAOC,OAAO,GACZC,QAAQ,4HACRC,QAAQ,CAAC,YAAY,CAAEC,kBAAkB","ignoreList":[0],"debugId":null}}]
-}

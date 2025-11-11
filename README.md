@@ -1,22 +1,6 @@
 <div align="center">
-  <!-- place `public/mess.png` to show the app logo here -->
-  <img src="/mess.png" alt="App logo" width="160" />
-  <h1>OPSC — Therapy Practice Platform</h1>
-</div>
-
-Overview
---------
-OPSC helps therapists set up and operate a practice from onboarding to billing and patient care. It combines credentialing automation, telehealth, payments, a lightweight EHR, and realtime messaging in two delivery modes: self-hosted and cloud multi-tenant.
-
-Product vision
---------------
-Create an open-source platform inspired by Alma and Headway, offering:
-
-- A self-hosted guided workflow for therapists who want full control.
-- A low-cost managed multi-tenant SaaS for therapists who prefer a hosted option.
-<div align="center">
-  <!-- place `public/mess.png` to show the app logo here -->
-  <img src="/mess.png" alt="App logo" width="160" />
+  <!-- place `public/logo.png` to show the app logo here -->
+  <img src="/logo.png" alt="App logo" width="160" />
   <h1>OPSC — Therapy Practice Platform</h1>
 </div>
 
@@ -36,95 +20,56 @@ Create an open-source platform inspired by Alma and Headway, offering:
 - Credentialing automation using RAG/document extraction to reduce manual application work.
 - HIPAA-aware realtime messaging with moderation, audit trails, and optional ML assistance.
 - Extensible integrations: Zoom/Google Meet for telehealth, Stripe for payments, Optum for claims.
-
-## 1. Prisma migration (10-step plan)
-
-This project is tracking a planned migration from TypeORM to Prisma. The high-level 10-step plan is maintained in the repo TODOs and reproduced here for visibility so contributors can follow a single source of truth.
-
-1.1 Prep and safety
-
-- Create a branch `feature/prisma-migration` (we use `feature/prisma-migration-1.1` for the initial POC).
-- Keep TypeORM in place while migrating incrementally. Back up production DB and test migrations in staging before deploying to production.
-
-1.2 Install Prisma & initialize
-
-- Install `prisma` (dev) and `@prisma/client` (runtime).
-- Run `npx prisma init` to create the `prisma/` folder and initial config.
-
-1.3 Create initial Prisma schema
-
-- Prefer `npx prisma db pull` to introspect the existing database and generate `schema.prisma` for the current schema.
-- Optionally author `schema.prisma` by hand when restructuring models.
-
-1.4 Generate client
-
-- Run `npx prisma generate` to create the Prisma Client.
-- Add a singleton client at `src/lib/prisma.ts` for easy import across services.
-
-1.5 Add Prisma side-by-side
-
-- Use Prisma alongside TypeORM. Implement small Prisma-based services first (start with `User` and `Role`).
-
-1.6 Convert models incrementally (POC)
-
-- Convert `User` and `Role` as a proof-of-concept. Update a small set of tests to use Prisma (SQLite for test runs).
-
-1.7 Data migrations and syncing
-
-- If you modify schema, use `prisma migrate dev` locally to generate migrations. For production deploys run `prisma migrate deploy` or apply SQL migration scripts in a controlled window.
-
-1.8 Replace TypeORM-specific features
-
-- Reimplement TypeORM subscribers, entity listeners, and lifecycle hooks as application-level hooks or Prisma middleware. Rewrite custom repositories as small service functions around the Prisma client.
-
-1.9 Full switch & cleanup
-
-- Once all code uses Prisma, remove TypeORM dependencies, config, and unused entity files. Update CI and deployment manifests to run Prisma migrations and generate the client.
-
-1.10 Tests & verification
-
-- Run the full test suite, add integration tests for migrated paths, and perform a smoke test against staging data. Document the migration runbook and rollback steps.
-
-_This 10-step plan is also present in the project todo list. If you'd like, I can implement the initial POC (install/init Prisma and convert `User`/`Role`) on the `feature/prisma-migration-1.1` branch._
-
+.
 ## High-level epics & features
 
-### 1.1. User & Role Management (Backend)
+## 1. Setup: Next.js + Prisma + Better Auth + shadcn/ui
 
-- [ ] Define final DB schema for User, Role, UserRole (partially complete).
-- [ ] Create a database seed script to provision the first SuperAdmin user.
-- [ ] Build API endpoints (e.g., `/api/admin/users`) for SuperAdmin to manage user roles.
+This project will be re-bootstrapped on a minimal, secure foundation: Next.js (App Router + TypeScript), Prisma for the ORM, and Better Auth for authentication. UI primitives come from shadcn/ui (Tailwind + Radix primitives). The sections below capture the immediate setup and authentication design choices we will use for the refactor.
 
-### 1.2. Credentials Auth
+### 1.1 Project bootstrap (commands and artifacts)
 
-- [ ] Implement `authService.signup` for 'Patient' and 'Therapist' types.
-- [ ] Implement `authService.login` using email/password and bcrypt.
-- [ ] Build password recovery flow:
-  - [ ] API route to request a password reset token (generates token, sends email via nodemailer).
-  - [ ] API route to confirm and set a new password using the token.
+Overall goal: Bootstrap the Next.js + Prisma + Better Auth project with minimal artifacts.
 
-### 1.3. Passkey (WebAuthn) Auth
+- [ ] Create a new Next.js app (App Router + TypeScript): `npx create-next-app@latest . --use-npm --ts --app`
+- [ ] Install Prisma, Better Auth and UI tooling: `npm install -D prisma; npm install @prisma/client better-auth tailwindcss postcss autoprefixer; npx tailwindcss init -p; # add shadcn/ui pieces per the shadcn docs`
+- [ ] Initialize Prisma and generate the client: `npx prisma init; # set DATABASE_URL in .env to your dev Postgres (recommended); npx prisma db pull; # optional: introspect existing DB; npx prisma generate`
+- [ ] Create a global Prisma client at `src/lib/prisma.ts` and an auth wiring file at `src/lib/auth.ts` using Better Auth's Prisma adapter. See 1.3 and 1.4 for details.
 
-- [ ] Implement API endpoints for Passkey registration (initiate and verify).
-- [ ] Implement API endpoints for Passkey authentication (initiate and verify).
-- [ ] Create UI components in user settings for registering and managing passkeys.
+These steps produce the minimal artifacts we need: `prisma/schema.prisma`, `src/lib/prisma.ts`, `src/lib/auth.ts`, and the Next.js app skeleton.
 
-### 1.4. OAuth & Provider Linking
+### 1.2 User & Credentials (high-level contract)
 
-- [ ] Finalize NextAuth.js configuration for Google and Facebook providers.
-- [ ] Implement backend logic for `linkProvider` and `unlinkProvider` services.
-- [ ] Create UI components in user settings to manage linked OAuth accounts.
+Overall goal: Establish user management with secure authentication flows (email/password, OAuth, passkeys, TOTP) and role-based access.
 
-### 1.5. Profile Management
+- [ ] Define purpose and success criteria: inputs (email+password, passkey assertion, OAuth token), outputs (valid session + user object), success (full auth flows with audit records).
+- [ ] Implement design notes: use Better Auth's email+password provider and Prisma adapter for credential storage and sessions; maintain application domain models for Role/UserRole; prefer explicit linking UX for providers to avoid accidental merges.
 
-- [ ] Define DB schema for `TherapistProfile` (e.g., specialty, license, bio) and `PatientProfile` (e.g., basic info).
-- [ ] Create secure API endpoints (GET, PUT) for users to manage their own profiles.
+### 1.3 Better Auth: OAuth helper and session wiring
+
+Overall goal: Wire Better Auth for OAuth providers and session management, persisting to Prisma.
+
+- [ ] Use the Better Auth Prisma adapter to persist User, Session, Account, and Verification models; add models to `schema.prisma` and run migrations against a disposable database first.
+- [ ] Create `src/lib/auth.ts` and export a configured `auth` instance with emailAndPassword enabled and trusted origins.
+- [ ] Expose the Next.js API route at `src/app/api/auth/[...all]/route.ts` using `toNextJsHandler(auth)` from `better-auth/next-js`.
+- [ ] Configure OAuth provider credentials via env vars and implement explicit UI flow for linking/unlinking providers with audit entries.
+- [ ] Ensure security: never enable automatic provider-to-existing-account linking without verification for HIPAA-sensitive workflows.
+
+### 1.4 Passkeys & TOTP (Better Auth plugins)
+
+Overall goal: Enable passkeys (WebAuthn) and TOTP for strong, auditable multi-factor authentication.
+
+- [ ] Enable passkeys: use Better Auth's passkey plugin (or @simplewebauthn/server adapter); persist credential metadata in DB for audit/forensics.
+- [ ] Enable TOTP: use Better Auth TOTP plugin with encrypted secrets, recovery codes, and enrollment UI; require 2FA for sensitive operations.
+- [ ] Wire plugin options in `src/lib/auth.ts` (e.g., `passkeys: { enabled: true }`, `totp: { enabled: true }`); add extra Prisma models if needed and run migrations in test DB first.
+- [ ] Ensure audit records for passkey/TOTP flows (actor, timestamp, device metadata, IP).
+
 
 ## 2. Real-time Messaging (Priority)
 
 ### 2.1. Core Messaging MVP (Phase 1)
 
-- [X] Create `feature/messaging/realtime-init` branch.
+- [ ] Create `feature/messaging/realtime-init` branch.
 - [ ] Add entities: `src/db/entities/Thread.ts`, `Message.ts`, `MessageAudit.ts`.
 - [ ] Add deterministic moderation helper in `src/lib/moderation.ts` for test-mode.
 - [ ] Add Vitest integration test (sqlite) for moderation → blurred + audit.
@@ -295,38 +240,37 @@ With a 3-week timeline the pragmatic strategy is to focus on a small, testable M
 - [ ] Add Vitest integration test (sqlite) for moderation -> blurred + audit
 - [ ] Add `DEVELOPMENT.md` with run/test commands and quick docker-compose notes
 
-## How we will operate
+## Getting Started
 
-- Work in small increments on `feature/*` branches and target `dev` for integration.
-- Each PR should be small, include tests for the behavior changed, and pass CI before merging.
-- Use `NODE_ENV=test` deterministic behaviors for external integrations in tests (OpenAI, Zoom, Stripe).
-
-## Developer quick commands
-
-Install dependencies and run tests:
+First, run the development server:
 
 ```bash
-npm ci
-npm run test
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
 ```
 
-Create the messaging branch locally:
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-```bash
-git checkout dev
-git pull origin dev
-git checkout -b feature/messaging/realtime-init
-```
+You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-## Assets
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-- Add the app logo at `public/mess.png` to render the top-of-README image.
+## Learn More
 
-## Next choices
+To learn more about Next.js, take a look at the following resources:
 
-1) I can create `feature/messaging/realtime-init` and commit the minimal entities + initial integration test. (Recommended)
-2) I can scaffold a GitHub Actions `ci.yml` that runs tests on PRs.
-3) I can add `DEVELOPMENT.md` with local dev and docker-compose instructions.
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
 
-Tell me which to start and I'll proceed in the chosen feature branch.
-------------------------
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
