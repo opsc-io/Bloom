@@ -1,12 +1,12 @@
 <div align="center">
   <!-- place `public/logo.png` to show the app logo here -->
   <img src="/logo.svg" alt="App logo" width="160" />
-  <h1>OPSC — Therapy Practice Platform</h1>
+  <h1>Bloom — Therapy Practice Platform</h1>
 </div>
 
 ## Overview
 
-OPSC helps therapists set up and operate a practice from onboarding to billing and patient care. It combines credentialing automation, telehealth, payments, a lightweight EHR, and realtime messaging in two delivery modes: self-hosted and cloud multi-tenant.
+Bloom helps therapists set up and operate a practice from onboarding to billing and patient care. It combines credentialing automation, telehealth, payments, a lightweight EHR, and realtime messaging in two delivery modes: self-hosted and cloud multi-tenant.
 
 ## Product vision
 
