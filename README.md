@@ -1,6 +1,6 @@
 <div align="center">
   <!-- place `public/logo.png` to show the app logo here -->
-  <img src="/logo.png" alt="App logo" width="160" />
+  <img src="/logo.svg" alt="App logo" width="160" />
   <h1>OPSC — Therapy Practice Platform</h1>
 </div>
 
