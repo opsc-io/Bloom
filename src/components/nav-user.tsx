@@ -8,6 +8,7 @@ import {
   LogOut,
   Sparkles,
 } from "lucide-react"
+import { signOut } from "@/lib/auth-client"
 
 import {
   Avatar,
@@ -40,9 +41,9 @@ export function NavUser({
     avatar?: string | null
   }
 }) {
-  console.log("user in NavUser:", user);
   const { isMobile } = useSidebar()
-  const displayName = user.name
+  const displayName =
+    [user.firstname, user.lastname].filter(Boolean).join(" ").trim() || "User"
   const displayEmail = user.email ?? ""
   const fallbackInitial =
     (displayName?.charAt(0) || displayEmail?.charAt(0) || "U").toUpperCase()
@@ -112,7 +113,12 @@ export function NavUser({
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={async (event) => {
+                event.preventDefault()
+                await signOut()
+              }}
+            >
               <LogOut />
               Log out
             </DropdownMenuItem>
