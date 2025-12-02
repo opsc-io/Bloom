@@ -34,13 +34,15 @@ export function NavUser({
   user,
 }: {
   user: {
-    name?: string | null
+    firstname?: string | null
+    lastname?: string | null
     email?: string | null
     avatar?: string | null
   }
 }) {
+  console.log("user in NavUser:", user);
   const { isMobile } = useSidebar()
-  const displayName = user.name ?? "User"
+  const displayName = user.name
   const displayEmail = user.email ?? ""
   const fallbackInitial =
     (displayName?.charAt(0) || displayEmail?.charAt(0) || "U").toUpperCase()

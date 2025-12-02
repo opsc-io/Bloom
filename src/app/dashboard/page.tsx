@@ -1,4 +1,4 @@
- "use client";
+"use client";
 
 import { AppSidebar } from "@/components/app-sidebar"
 import {
@@ -42,7 +42,7 @@ export default function DashboardPage() {
     <SidebarProvider>
       <AppSidebar
         user={{
-          name: user.name,
+          name: user.firstname + " " + user.lastname,
           email: user.email,
           avatar: (user as { image?: string })?.image,
         }}
