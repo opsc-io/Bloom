@@ -2,22 +2,35 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { signUp } from "@/lib/auth-client";
+
+import { SignupForm } from "@/components/signup-form"
 
 export default function SignUpPage() {
     const router = useRouter();
     const [error, setError] = useState<string | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         setError(null);
+        setIsSubmitting(true);
 
         const formData = new FormData(e.currentTarget);
+        const password = (formData.get("password") as string) || "";
+        const confirmPassword = (formData.get("confirmPassword") as string) || "";
+
+        if (password !== confirmPassword) {
+            setError("Passwords do not match.");
+            setIsSubmitting(false);
+            return;
+        }
 
         const res = await signUp.email({
-            name: formData.get("name") as string,
-            email: formData.get("email") as string,
-            password: formData.get("password") as string,
+            name: (formData.get("name") as string) || "",
+            email: (formData.get("email") as string) || "",
+            password,
         });
 
         if (res.error) {
@@ -25,43 +38,27 @@ export default function SignUpPage() {
         } else {
             router.push("/dashboard");
         }
+
+        setIsSubmitting(false);
     }
 
     return (
-        <main className="max-w-md mx-auto p-6 space-y-4 text-white">
-            <h1 className="text-2xl font-bold">Sign Up</h1>
-
-            {error && <p className="text-red-500">{error}</p>}
-
-            <form onSubmit={handleSubmit} className="space-y-4">
-                <input
-                    name="name"
-                    placeholder="Full Name"
-                    required
-                    className="w-full rounded-md bg-neutral-900 border border-neutral-700 px-3 py-2"
+        <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
+            <div className="flex w-full max-w-sm flex-col gap-6">
+                <a href="#" className="flex items-center gap-8 self-center font-medium">
+                    <Image
+                        src="/logo.svg"
+                        alt="Bloom logo"
+                        width={175}
+                        height={175}
+                    />
+                </a>
+                <SignupForm
+                    onSubmit={(e: React.FormEvent) => { void handleSubmit(e as React.FormEvent<HTMLFormElement>); }}
+                    error={error}
+                    isSubmitting={isSubmitting}
                 />
-                <input
-                    name="email"
-                    type="email"
-                    placeholder="Email"
-                    required
-                    className="w-full rounded-md bg-neutral-900 border border-neutral-700 px-3 py-2"
-                />
-                <input
-                    name="password"
-                    type="password"
-                    placeholder="Password"
-                    required
-                    minLength={8}
-                    className="w-full rounded-md bg-neutral-900 border border-neutral-700 px-3 py-2"
-                />
-                <button
-                    type="submit"
-                    className="w-full bg-white text-black font-medium rounded-md px-4 py-2 hover:bg-gray-200"
-                >
-                    Create Account
-                </button>
-            </form>
-        </main>
-    );
+            </div>
+        </div>
+    )
 }
