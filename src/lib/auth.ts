@@ -9,6 +9,20 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
   },
+  user: {
+    additionalFields: {
+      firstname: {
+        type: 'string',
+        required: true,
+        input: true,
+      },
+      lastname: {
+        type: 'string',
+        required: true,
+        input: true,
+      },
+    },
+  },
   socialProviders: {
     google: {
       prompt: "select_account",

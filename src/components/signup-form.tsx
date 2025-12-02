@@ -46,13 +46,24 @@ export function SignupForm({
             ) : null}
             <FieldGroup>
               <Field>
-                <FieldLabel htmlFor="name">Full Name</FieldLabel>
+                <FieldLabel htmlFor="first-name">First Name</FieldLabel>
                 <Input
-                  id="name"
-                  name="name"
+                  id="first-name"
+                  name="firstName"
                   type="text"
-                  placeholder="John Doe"
-                  autoComplete="name"
+                  placeholder="John"
+                  autoComplete="given-name"
+                  required
+                />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="last-name">Last Name</FieldLabel>
+                <Input
+                  id="last-name"
+                  name="lastName"
+                  type="text"
+                  placeholder="Doe"
+                  autoComplete="family-name"
                   required
                 />
               </Field>

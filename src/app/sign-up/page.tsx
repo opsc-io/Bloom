@@ -28,7 +28,8 @@ export default function SignUpPage() {
         }
 
         const res = await signUp.email({
-            name: (formData.get("name") as string) || "",
+            firstname: (formData.get("firstName") as string) || "",
+            lastname: (formData.get("lastName") as string) || "",
             email: (formData.get("email") as string) || "",
             password,
         });

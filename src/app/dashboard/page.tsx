@@ -1,37 +1,84 @@
-"use client";
+ "use client";
+
+import { AppSidebar } from "@/components/app-sidebar"
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb"
+import { Separator } from "@/components/ui/separator"
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar"
 
 import { useRouter } from "next/navigation";
-import { useSession, signOut } from "@/lib/auth-client";
+import { useSession } from "@/lib/auth-client";
 import { useEffect } from "react";
 
+
+
 export default function DashboardPage() {
-    const router = useRouter();
-    const { data: session, isPending } = useSession();
+  const router = useRouter();
+  const { data: session, isPending } = useSession();
 
-    useEffect(() => {
-        if (!isPending && !session?.user) {
-            router.push("/sign-in");
-        }
-    }, [isPending, session, router]);
+  useEffect(() => {
+    if (!isPending && !session?.user) {
+      router.push("/sign-in");
+    }
+  }, [isPending, session, router]);
 
-    if (isPending)
-        return <p className="text-center mt-8 text-white">Loading...</p>;
-    if (!session?.user)
-        return <p className="text-center mt-8 text-white">Redirecting...</p>;
+  if (isPending)
+    return <p className="text-center mt-8 text-white">Loading...</p>;
+  if (!session?.user)
+    return <p className="text-center mt-8 text-white">Redirecting...</p>;
 
-    const { user } = session;
-
-    return (
-        <main className="max-w-md h-screen flex items-center justify-center flex-col mx-auto p-6 space-y-4 text-white">
-            <h1 className="text-2xl font-bold">Dashboard</h1>
-            <p>Welcome, {user.name || "User"}!</p>
-            <p>Email: {user.email}</p>
-            <button
-                onClick={() => signOut()}
-                className="w-full bg-white text-black font-medium rounded-md px-4 py-2 hover:bg-gray-200"
-            >
-                Sign Out
-            </button>
-        </main>
-    );
+  const { user } = session;
+  return (
+    <SidebarProvider>
+      <AppSidebar
+        user={{
+          name: user.name,
+          email: user.email,
+          avatar: (user as { image?: string })?.image,
+        }}
+      />
+      <SidebarInset>
+        <header className="flex h-16 shrink-0 items-center gap-2">
+          <div className="flex items-center gap-2 px-4">
+            <SidebarTrigger className="-ml-1" />
+            <Separator
+              orientation="vertical"
+              className="mr-2 data-[orientation=vertical]:h-4"
+            />
+            <Breadcrumb>
+              <BreadcrumbList>
+                <BreadcrumbItem className="hidden md:block">
+                  <BreadcrumbLink href="#">
+                    Building Your Application
+                  </BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                </BreadcrumbItem>
+              </BreadcrumbList>
+            </Breadcrumb>
+          </div>
+        </header>
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+          <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+            <div className="bg-muted/50 aspect-video rounded-xl" />
+            <div className="bg-muted/50 aspect-video rounded-xl" />
+            <div className="bg-muted/50 aspect-video rounded-xl" />
+          </div>
+          <div className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  )
 }
