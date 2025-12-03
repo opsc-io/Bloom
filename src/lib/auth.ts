@@ -42,13 +42,13 @@ export const auth = betterAuth({
         type: 'string',
         input: true,
       },
-      therapist: {
+      is_therapist: {
         type: 'boolean',
         required: false,
         input: false,
         default: false
       },
-      administrator: {
+      is_administrator: {
         type: 'boolean',
         required: false,
         input: false,
