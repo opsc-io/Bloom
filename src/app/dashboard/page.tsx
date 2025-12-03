@@ -6,7 +6,6 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  //BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
@@ -16,13 +15,30 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
-
-
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { useEffect } from "react";
+import { ChartPie, Database, Server, ExternalLink } from "lucide-react"
 
+// Grafana dashboard URLs based on environment
+const getGrafanaUrl = () => {
+  const isProduction = typeof window !== 'undefined' &&
+    (window.location.hostname === 'bloomhealth.us' || window.location.hostname === 'www.bloomhealth.us');
 
+  return isProduction
+    ? 'https://opscvisuals.grafana.net/d/bloom-production/bloom-production'
+    : 'https://opscvisuals.grafana.net/d/bloom-qa/bloom-qa';
+};
+
+const getEnvironment = () => {
+  if (typeof window === 'undefined') return 'Development';
+  const hostname = window.location.hostname;
+  if (hostname === 'bloomhealth.us' || hostname === 'www.bloomhealth.us') return 'Production';
+  if (hostname === 'qa.bloomhealth.us') return 'QA';
+  return 'Development';
+};
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -40,11 +56,13 @@ export default function DashboardPage() {
     return <p className="text-center mt-8 text-white">Redirecting...</p>;
 
   const { user } = session;
-  return (
+  const isAdmin = user.administrator === true;
+  const grafanaUrl = getGrafanaUrl();
+  const environment = getEnvironment();
 
+  return (
     <SidebarProvider>
-      <AppSidebar user={user}
-      />
+      <AppSidebar user={user} />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2">
           <div className="flex items-center gap-2 px-4">
@@ -66,12 +84,105 @@ export default function DashboardPage() {
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-            <Skeleton className="bg-muted/50 aspect-video rounded-xl" />
-            <Skeleton className="bg-muted/50 aspect-video rounded-xl" />
-            <Skeleton className="bg-muted/50 aspect-video rounded-xl" />
-          </div>
-          <Skeleton className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
+          {isAdmin ? (
+            <>
+              {/* Admin Dashboard - Stats Cards */}
+              <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+                <Card className="aspect-video flex flex-col justify-between">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">Observability</CardTitle>
+                      <ChartPie className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex flex-col justify-end flex-1">
+                    <div className="text-2xl font-bold">Grafana</div>
+                    <p className="text-xs text-muted-foreground">Real-time metrics</p>
+                    <Button variant="outline" size="sm" className="mt-3" asChild>
+                      <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
+                        Open <ExternalLink className="ml-1 h-3 w-3" />
+                      </a>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="aspect-video flex flex-col justify-between">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">Database</CardTitle>
+                      <Database className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex flex-col justify-end flex-1">
+                    <div className="text-2xl font-bold">CockroachDB</div>
+                    <p className="text-xs text-muted-foreground">
+                      {environment === 'Production' ? 'meek-wallaby' : 'exotic-cuscus'}
+                    </p>
+                    <Button variant="outline" size="sm" className="mt-3" asChild>
+                      <a href="https://cockroachlabs.cloud" target="_blank" rel="noopener noreferrer">
+                        Console <ExternalLink className="ml-1 h-3 w-3" />
+                      </a>
+                    </Button>
+                  </CardContent>
+                </Card>
+
+                <Card className="aspect-video flex flex-col justify-between">
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm font-medium">Hosting</CardTitle>
+                      <Server className="h-4 w-4 text-muted-foreground" />
+                    </div>
+                  </CardHeader>
+                  <CardContent className="flex flex-col justify-end flex-1">
+                    <div className="text-2xl font-bold">Vercel</div>
+                    <p className="text-xs text-muted-foreground">{environment}</p>
+                    <Button variant="outline" size="sm" className="mt-3" asChild>
+                      <a href="https://vercel.com/opsc/bloom" target="_blank" rel="noopener noreferrer">
+                        Project <ExternalLink className="ml-1 h-3 w-3" />
+                      </a>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Admin Dashboard - Grafana Embed */}
+              <Card className="min-h-[100vh] flex-1 md:min-h-min">
+                <CardHeader className="pb-2">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Analytics Dashboard</CardTitle>
+                      <CardDescription>{environment} Environment</CardDescription>
+                    </div>
+                    <Button size="sm" asChild>
+                      <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
+                        Full Screen <ExternalLink className="ml-1 h-3 w-3" />
+                      </a>
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="h-[calc(100vh-300px)] min-h-[500px]">
+                  <iframe
+                    src={`${grafanaUrl}?orgId=1&kiosk`}
+                    width="100%"
+                    height="100%"
+                    frameBorder="0"
+                    className="rounded-lg border"
+                    title="Grafana Dashboard"
+                  />
+                </CardContent>
+              </Card>
+            </>
+          ) : (
+            <>
+              {/* Regular User Dashboard - Placeholder */}
+              <div className="grid auto-rows-min gap-4 md:grid-cols-3">
+                <Skeleton className="bg-muted/50 aspect-video rounded-xl" />
+                <Skeleton className="bg-muted/50 aspect-video rounded-xl" />
+                <Skeleton className="bg-muted/50 aspect-video rounded-xl" />
+              </div>
+              <Skeleton className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
+            </>
+          )}
         </div>
       </SidebarInset>
     </SidebarProvider>
