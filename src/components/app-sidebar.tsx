@@ -13,6 +13,7 @@ import {
   Send,
   Settings2,
   SquareTerminal,
+  ShieldCheck,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -136,6 +137,7 @@ type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
     name?: string | null
     email?: string | null
     avatar?: string | null
+    administrator?: boolean | null
   }
 }
 
@@ -146,6 +148,25 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
       email: "",
       avatar: "",
     }
+
+  // Add Admin menu item if user is administrator
+  const navMainWithAdmin = user?.administrator
+    ? [
+        ...data.navMain,
+        {
+          title: "Admin",
+          url: "/admin",
+          icon: ShieldCheck,
+          isActive: false,
+          items: [
+            {
+              title: "Dashboard",
+              url: "/admin",
+            },
+          ],
+        },
+      ]
+    : data.navMain;
 
   return (
     <Sidebar variant="inset" {...props}>
@@ -166,7 +187,7 @@ export function AppSidebar({ user, ...props }: AppSidebarProps) {
         </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navMainWithAdmin} />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
       <SidebarFooter>
