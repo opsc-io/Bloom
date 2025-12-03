@@ -9,7 +9,6 @@ CREATE TABLE "user" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "name" STRING NOT NULL,
-    "role" BOOL NOT NULL,
     "therapist" BOOL,
     "administrator" BOOL,
 

@@ -1,7 +1,7 @@
-import { betterAuth, boolean } from 'better-auth'
+import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from '@/lib/prisma'
-import { admin } from 'better-auth/plugins/admin'
+
 
 
 
@@ -65,7 +65,7 @@ export const auth = betterAuth({
       mapProfileToUser: (profile) => ({
         firstname: profile.given_name,
         lastname: profile.family_name ? profile.family_name : " ",
-        avatarUrl: profile.picture,
+        image: profile.picture,
         email: profile.email,
       }),
     },
