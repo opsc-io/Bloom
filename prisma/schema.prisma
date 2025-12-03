@@ -28,9 +28,36 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  name          String
-  therapist     Boolean?
-  administrator Boolean?
+  conversationParticipants ConversationParticipant[]
+  messages                 Message[]
+  messageReactions         MessageReaction[]
+
+  is_therapist     Boolean? @default(false)
+  is_administrator Boolean? @default(false)
+
+  name String
+
+  paymentMethods        PaymentMethod[]
+  payments              Payment[]
+  claimsAsPatient       Claim[]              @relation("ClaimPatient")
+  claimsAsTherapist     Claim[]              @relation("ClaimTherapist")
+
+  appointmentsAsTherapist Appointment[]      @relation("AppointmentTherapist")
+  appointmentsAsPatient   Appointment[]      @relation("AppointmentPatient")
+
+  appointmentNotes AppointmentNote[]         @relation("AppointmentNoteAuthor")
+  waitlistRequests WaitlistEntry[]           @relation("WaitlistPatient")
+  waitlistOffers   WaitlistEntry[]           @relation("WaitlistTherapist")
+
+  fileAssetsOwned    FileAsset[]             @relation("FileOwner")
+  fileAssetsUploaded FileAsset[]             @relation("FileUploader")
+  fileSharesReceived FileShare[]             @relation("FileShareRecipient")
+
+  therapistProfile      TherapistProfile?
+  patientMedicalProfile PatientMedicalProfile?
+
+  supportTicketsCreated  SupportTicket[]     @relation("TicketCreator")
+  supportTicketsAssigned SupportTicket[]     @relation("TicketAssignee")
 
   @@unique([email])
   @@map("user")
@@ -82,4 +109,412 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
+}
+
+model logs {
+  id        String   @id
+  level     String
+  userId    String?
+  message   String
+  meta      String?
+  timestamp DateTime @default(now())
+
+  @@map("logs")
+}
+
+// Roles (if not already in User)
+
+enum UserRole {
+  THERAPIST
+  PATIENT
+}
+
+// Conversations
+
+model Conversation {
+  id            String                    @id @default(cuid())
+  createdAt     DateTime                  @default(now())
+  updatedAt     DateTime                  @updatedAt
+  lastMessageAt DateTime?
+  participants  ConversationParticipant[]
+  messages      Message[]
+
+  @@index([lastMessageAt])
+}
+
+// Link users to conversations
+
+model ConversationParticipant {
+  id             String   @id @default(cuid())
+  conversationId String
+  userId         String
+  role           UserRole
+  joinedAt       DateTime @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+  @@index([userId, role])
+}
+
+// Messages (persisted)
+
+model Message {
+  id             String              @id @default(cuid())
+  conversationId String
+  senderId       String
+  body           String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  edited         Boolean             @default(false)
+  attachments    MessageAttachment[]
+  reactions      MessageReaction[]
+  // delivery receipts can be tracked in Redis for speed; store to DB if you need history
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+// File uploads
+
+model MessageAttachment {
+  id        String @id @default(cuid())
+  messageId String
+  url       String
+  fileName  String
+  mimeType  String
+  sizeBytes Int
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+}
+
+// Emoji reactions
+
+model MessageReaction {
+  id        String @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String // shortcode or Unicode
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+}
+
+// Payments and claims
+
+enum PaymentMethodType {
+  CARD
+  BANK_TRANSFER
+  FSA
+  HSA
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+enum ClaimStatus {
+  DRAFT
+  SUBMITTED
+  REJECTED
+  APPROVED
+  PAID
+}
+
+enum ClaimPayer {
+  OPTUM
+  CLEARING_HOUSE
+  OTHER
+}
+
+model PaymentMethod {
+  id                    String            @id @default(cuid())
+  userId                String
+  type                  PaymentMethodType
+  brand                 String?
+  last4                 String?
+  expMonth              Int?
+  expYear               Int?
+  stripePaymentMethodId String?
+  isDefault             Boolean           @default(false)
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([stripePaymentMethodId])
+}
+
+model Payment {
+  id                    String        @id @default(cuid())
+  userId                String
+  amountCents           Int
+  currency              String        @default("usd")
+  status                PaymentStatus @default(PENDING)
+  stripePaymentIntentId String?
+  stripeChargeId        String?
+  description           String?
+  metadata              Json?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([stripePaymentIntentId])
+}
+
+model Claim {
+  id              String      @id @default(cuid())
+  patientId       String
+  therapistId     String
+  appointmentId   String?
+  payer           ClaimPayer  @default(OTHER)
+  status          ClaimStatus @default(DRAFT)
+  submittedAt     DateTime?
+  responseCode    String?
+  rejectionReason String?
+  externalClaimId String?
+  metadata        Json?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  patient     User         @relation("ClaimPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  therapist   User         @relation("ClaimTherapist", fields: [therapistId], references: [id], onDelete: Cascade)
+  appointment Appointment? @relation(fields: [appointmentId], references: [id], onDelete: SetNull)
+
+  @@index([patientId])
+  @@index([therapistId])
+  @@index([status])
+  @@index([externalClaimId])
+}
+
+// Appointments and waitlist
+
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model Appointment {
+  id            String            @id @default(cuid())
+  therapistId   String
+  patientId     String
+  startAt       DateTime
+  endAt         DateTime
+  status        AppointmentStatus @default(SCHEDULED)
+  zoomMeetingId String?
+  zoomJoinUrl   String?
+  zoomStartUrl  String?
+  notes         AppointmentNote[]
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  therapist User    @relation("AppointmentTherapist", fields: [therapistId], references: [id], onDelete: Cascade)
+  patient   User    @relation("AppointmentPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  claims    Claim[]
+
+  @@index([therapistId, startAt])
+  @@index([patientId, startAt])
+  @@index([status])
+}
+
+model AppointmentNote {
+  id             String   @id @default(cuid())
+  appointmentId  String
+  authorId       String
+  content        String
+  previousNoteId String? @unique
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  appointment Appointment      @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  author      User             @relation("AppointmentNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  previous    AppointmentNote? @relation("PreviousAppointmentNote", fields: [previousNoteId], references: [id], onDelete: SetNull)
+  next        AppointmentNote? @relation("PreviousAppointmentNote")
+
+  @@index([appointmentId])
+  @@index([authorId])
+}
+
+enum WaitlistStatus {
+  REQUESTED
+  OFFERED
+  ACCEPTED
+  DECLINED
+  CANCELLED
+}
+
+model WaitlistEntry {
+  id            String         @id @default(cuid())
+  patientId     String
+  therapistId   String
+  desiredAfter  DateTime?
+  desiredBefore DateTime?
+  status        WaitlistStatus @default(REQUESTED)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  patient   User @relation("WaitlistPatient", fields: [patientId], references: [id], onDelete: Cascade)
+  therapist User @relation("WaitlistTherapist", fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([therapistId])
+  @@index([status])
+}
+
+// File sharing
+
+enum FileAccessLevel {
+  VIEW
+  EDIT
+}
+
+model FileAsset {
+  id         String   @id @default(cuid())
+  ownerId    String
+  uploadedBy String
+  fileName   String
+  mimeType   String
+  sizeBytes  Int
+  url        String
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  owner           User                 @relation("FileOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  uploader        User                 @relation("FileUploader", fields: [uploadedBy], references: [id], onDelete: Cascade)
+  shares          FileShare[]
+  extractions     DocumentExtraction[]
+  ticketDocuments TicketDocument[]
+
+  @@index([ownerId])
+  @@index([uploadedBy])
+}
+
+model FileShare {
+  id           String          @id @default(cuid())
+  fileId       String
+  sharedWithId String
+  accessLevel  FileAccessLevel @default(VIEW)
+  createdAt    DateTime        @default(now())
+
+  file       FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  sharedWith User      @relation("FileShareRecipient", fields: [sharedWithId], references: [id], onDelete: Cascade)
+
+  @@unique([fileId, sharedWithId])
+}
+
+// Profiles
+
+model TherapistProfile {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  bio                  String?
+  specialties          String?
+  credentials          String?
+  acceptsNewPatients   Boolean  @default(false)
+  publicProfileEnabled Boolean  @default(false)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model PatientMedicalProfile {
+  id          String   @id @default(cuid())
+  patientId   String   @unique
+  conditions  String?
+  medications String?
+  allergies   String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  patient User @relation(fields: [patientId], references: [id], onDelete: Cascade)
+}
+
+// Admin support and ticketing
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TicketPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+model SupportTicket {
+  id           String           @id @default(cuid())
+  createdById  String
+  assignedToId String?
+  subject      String
+  description  String
+  status       TicketStatus     @default(OPEN)
+  priority     TicketPriority   @default(MEDIUM)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  documents    TicketDocument[]
+
+  createdBy  User  @relation("TicketCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  assignedTo User? @relation("TicketAssignee", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  @@index([status])
+  @@index([priority])
+  @@index([createdById])
+}
+
+model TicketDocument {
+  id        String   @id @default(cuid())
+  ticketId  String
+  fileId    String
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  file   FileAsset     @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@unique([ticketId, fileId])
+  @@index([fileId])
+}
+
+// Document processing for extraction
+
+enum DocumentExtractionStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model DocumentExtraction {
+  id             String                   @id @default(cuid())
+  fileId         String
+  status         DocumentExtractionStatus @default(PENDING)
+  extractedText  String?
+  structuredData Json?
+  errorMessage   String?
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  file FileAsset @relation(fields: [fileId], references: [id], onDelete: Cascade)
+
+  @@index([fileId])
+  @@index([status])
 }

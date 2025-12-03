@@ -1,7 +1,7 @@
 import { betterAuth, boolean } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from '@/lib/prisma'
-import { admin } from 'better-auth/plugins/admin'
+
 
 
 
@@ -17,6 +17,7 @@ const getBaseURL = () => {
 }
 
 export const auth = betterAuth({
+  experimental: { joins: true },
   baseURL: getBaseURL(),
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
@@ -46,13 +47,13 @@ export const auth = betterAuth({
         type: 'boolean',
         required: false,
         input: false,
-        default: false
+        defaultValue: false
       },
       is_administrator: {
         type: 'boolean',
         required: false,
         input: false,
-        default: false
+        defaultValue: false
       },
     },
   },
