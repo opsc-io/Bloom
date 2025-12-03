@@ -41,13 +41,9 @@ export default function DashboardPage() {
 
   const { user } = session;
   return (
+
     <SidebarProvider>
-      <AppSidebar
-        user={{
-          name: user.firstname + " " + user.lastname,
-          email: user.email,
-          avatar: (user as { image?: string })?.image,
-        }}
+      <AppSidebar user={user}
       />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2">

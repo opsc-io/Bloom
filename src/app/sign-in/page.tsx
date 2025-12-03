@@ -6,6 +6,7 @@ import { signIn } from "@/lib/auth-client";
 import Image from "next/image";
 import { LoginForm } from "@/components/login-form"
 
+
 export default function LoginPage() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -34,13 +35,30 @@ export default function LoginPage() {
     }
   }
 
+  async function handleGoogleSignIn() {
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await signIn.social({ provider: "google" });
+    } catch (err) {
+      setError("Unable to start Google sign in. Please try again.");
+      setIsSubmitting(false);
+    }
+  }
+
   return (
+
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
         <a href="#" className="flex items-center gap-2 self-center font-medium">
           <Image src="/logo.svg" alt="Logo" width={150} height={150} />
         </a>
-        <LoginForm onSubmit={(e) => handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>)} error={error} isSubmitting={isSubmitting} />
+        <LoginForm
+          onSubmit={(e) => handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>)}
+          onGoogleSignIn={handleGoogleSignIn}
+          error={error}
+          isSubmitting={isSubmitting}
+        />
 
       </div>
     </div>

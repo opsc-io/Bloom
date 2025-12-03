@@ -1,6 +1,9 @@
-import { betterAuth } from 'better-auth'
+import { betterAuth, boolean } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from '@/lib/prisma'
+import { admin } from 'better-auth/plugins/admin'
+
+
 
 // Handle dynamic Vercel URLs for preview deployments
 const getBaseURL = () => {
@@ -36,16 +39,34 @@ export const auth = betterAuth({
       },
       lastname: {
         type: 'string',
-        required: true,
         input: true,
+      },
+      therapist: {
+        type: 'boolean',
+        required: false,
+        input: false,
+        default: false
+      },
+      administrator: {
+        type: 'boolean',
+        required: false,
+        input: false,
+        default: false
       },
     },
   },
   socialProviders: {
     google: {
-      prompt: "select_account",
+      accessType: "offline",
+      prompt: "select_account consent",
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      mapProfileToUser: (profile) => ({
+        firstname: profile.given_name,
+        lastname: profile.family_name ? profile.family_name : " ",
+        avatarUrl: profile.picture,
+        email: profile.email,
+      }),
     },
     zoom: {
       clientId: process.env.ZOOM_CLIENT_ID as string,

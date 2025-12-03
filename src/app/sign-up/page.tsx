@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { signUp } from "@/lib/auth-client";
+import { signIn, signUp } from "@/lib/auth-client";
 
 import { SignupForm } from "@/components/signup-form"
 
@@ -50,6 +50,17 @@ export default function SignUpPage() {
         setIsSubmitting(false);
     }
 
+    async function handleGoogleSignup() {
+        setError(null);
+        setIsSubmitting(true);
+        try {
+            await signIn.social({ provider: "google" });
+        } catch (err) {
+            setError("Unable to start Google sign up. Please try again.");
+            setIsSubmitting(false);
+        }
+    }
+
     return (
         <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
             <div className="flex w-full max-w-sm flex-col gap-6">
@@ -65,6 +76,7 @@ export default function SignUpPage() {
                     onSubmit={(e: React.FormEvent) => { void handleSubmit(e as React.FormEvent<HTMLFormElement>); }}
                     error={error}
                     isSubmitting={isSubmitting}
+                    onGoogleSignUp={handleGoogleSignup}
                 />
             </div>
         </div>

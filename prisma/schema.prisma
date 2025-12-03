@@ -28,7 +28,9 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  name String
+  name          String
+  therapist     Boolean?
+  administrator Boolean?
 
   @@unique([email])
   @@map("user")
