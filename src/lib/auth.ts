@@ -25,6 +25,7 @@ export const auth = betterAuth({
     'http://localhost:3000',
     'https://bloomhealth.us',
     'https://www.bloomhealth.us',
+    'https://qa.bloomhealth.us',
     process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
   ].filter(Boolean),
   emailAndPassword: {
