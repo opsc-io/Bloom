@@ -19,7 +19,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { useEffect, useState } from "react";
-import { Users, UserCheck, ShieldCheck, Activity, TrendingUp, Clock } from "lucide-react"
+import { Users, UserCheck, ShieldCheck, Activity, TrendingUp, Clock, BarChart3, ExternalLink } from "lucide-react"
+import { Button } from "@/components/ui/button"
 import {
   AreaChart,
   Area,
@@ -63,6 +64,8 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
+  const [grafanaPanels, setGrafanaPanels] = useState<{ id: number; title: string; type: string }[]>([]);
+  const [grafanaLoading, setGrafanaLoading] = useState(true);
 
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -96,6 +99,30 @@ export default function DashboardPage() {
       // Refresh every 30 seconds
       const interval = setInterval(fetchStats, 30000);
       return () => clearInterval(interval);
+    }
+  }, [session?.user?.administrator]);
+
+  // Fetch Grafana panels
+  useEffect(() => {
+    const fetchGrafanaPanels = async () => {
+      if (session?.user?.administrator) {
+        try {
+          setGrafanaLoading(true);
+          const response = await fetch("/api/admin/grafana?endpoint=panels");
+          if (response.ok) {
+            const data = await response.json();
+            setGrafanaPanels(data.panels || []);
+          }
+        } catch (err) {
+          console.error("Failed to fetch Grafana panels:", err);
+        } finally {
+          setGrafanaLoading(false);
+        }
+      }
+    };
+
+    if (session?.user?.administrator) {
+      fetchGrafanaPanels();
     }
   }, [session?.user?.administrator]);
 
@@ -354,6 +381,67 @@ export default function DashboardPage() {
                           ))}
                         </tbody>
                       </table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Grafana Panels Section */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle>Grafana Analytics</CardTitle>
+                      <CardDescription>Live dashboard panels from Grafana</CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                      <Button variant="outline" size="sm" asChild>
+                        <a
+                          href="https://opscvisuals.grafana.net/d/bloom-qa/bloom-qa"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Open Grafana <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {grafanaLoading ? (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <Skeleton className="h-[300px] w-full" />
+                      <Skeleton className="h-[300px] w-full" />
+                    </div>
+                  ) : grafanaPanels.length > 0 ? (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {grafanaPanels.slice(0, 4).map((panel) => (
+                        <div key={panel.id} className="relative">
+                          <div className="text-sm font-medium mb-2">{panel.title}</div>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`/api/admin/grafana?endpoint=render&panelId=${panel.id}&width=600&height=300`}
+                            alt={panel.title}
+                            className="w-full h-auto rounded-lg border bg-background"
+                            loading="lazy"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <BarChart3 className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>Grafana panels will appear here once configured</p>
+                      <Button variant="outline" className="mt-4" asChild>
+                        <a
+                          href="https://opscvisuals.grafana.net/d/bloom-qa/bloom-qa"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Configure in Grafana <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      </Button>
                     </div>
                   )}
                 </CardContent>
