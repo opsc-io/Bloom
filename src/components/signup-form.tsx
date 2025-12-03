@@ -19,6 +19,7 @@ type SignupFormProps = React.ComponentProps<"div"> & {
   onSubmit?: (e: React.FormEvent<HTMLFormElement>) => void
   error?: string | null
   isSubmitting?: boolean
+  onGoogleSignUp?: () => void
 }
 
 export function SignupForm({
@@ -26,6 +27,7 @@ export function SignupForm({
   onSubmit,
   error,
   isSubmitting,
+  onGoogleSignUp,
   ...props
 }: SignupFormProps) {
   return (
@@ -45,6 +47,17 @@ export function SignupForm({
               </p>
             ) : null}
             <FieldGroup>
+              <Field>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full"
+                  disabled={isSubmitting}
+                  onClick={onGoogleSignUp}
+                >
+                  Continue with Google
+                </Button>
+              </Field>
               <Field>
                 <FieldLabel htmlFor="first-name">First Name</FieldLabel>
                 <Input

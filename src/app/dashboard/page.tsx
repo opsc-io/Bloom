@@ -6,7 +6,7 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  BreadcrumbPage,
+  //BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
@@ -40,17 +40,10 @@ export default function DashboardPage() {
     return <p className="text-center mt-8 text-white">Redirecting...</p>;
 
   const { user } = session;
-  const typedUser = user as { firstname?: string; lastname?: string; name?: string; email: string; image?: string };
   return (
+
     <SidebarProvider>
-      <AppSidebar
-        user={{
-          name: typedUser.firstname && typedUser.lastname
-            ? `${typedUser.firstname} ${typedUser.lastname}`
-            : typedUser.name || "User",
-          email: typedUser.email,
-          avatar: typedUser.image,
-        }}
+      <AppSidebar user={user}
       />
       <SidebarInset>
         <header className="flex h-16 shrink-0 items-center gap-2">

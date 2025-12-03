@@ -31,10 +31,10 @@ This project will be re-bootstrapped on a minimal, secure foundation: Next.js (A
 
 Overall goal: Bootstrap the Next.js + Prisma + Better Auth project with minimal artifacts.
 
-- [ ] Create a new Next.js app (App Router + TypeScript): `npx create-next-app@latest . --use-npm --ts --app`
-- [ ] Install Prisma, Better Auth and UI tooling: `npm install -D prisma; npm install @prisma/client better-auth tailwindcss postcss autoprefixer; npx tailwindcss init -p; # add shadcn/ui pieces per the shadcn docs`
-- [ ] Initialize Prisma and generate the client: `npx prisma init; # set DATABASE_URL in .env to your dev Postgres (recommended); npx prisma db pull; # optional: introspect existing DB; npx prisma generate`
-- [ ] Create a global Prisma client at `src/lib/prisma.ts` and an auth wiring file at `src/lib/auth.ts` using Better Auth's Prisma adapter. See 1.3 and 1.4 for details.
+- [x] Create a new Next.js app (App Router + TypeScript): `npx create-next-app@latest . --use-npm --ts --app`
+- [x] Install Prisma, Better Auth and UI tooling: `npm install -D prisma; npm install @prisma/client better-auth tailwindcss postcss autoprefixer; npx tailwindcss init -p; # add shadcn/ui pieces per the shadcn docs`
+- [x] Initialize Prisma and generate the client: `npx prisma init; # set DATABASE_URL in .env to your dev Postgres (recommended); npx prisma db pull; # optional: introspect existing DB; npx prisma generate`
+- [x] Create a global Prisma client at `src/lib/prisma.ts` and an auth wiring file at `src/lib/auth.ts` using Better Auth's Prisma adapter. See 1.3 and 1.4 for details.
 
 These steps produce the minimal artifacts we need: `prisma/schema.prisma`, `src/lib/prisma.ts`, `src/lib/auth.ts`, and the Next.js app skeleton.
 
@@ -42,18 +42,18 @@ These steps produce the minimal artifacts we need: `prisma/schema.prisma`, `src/
 
 Overall goal: Establish user management with secure authentication flows (email/password, OAuth, passkeys, TOTP) and role-based access.
 
-- [ ] Define purpose and success criteria: inputs (email+password, passkey assertion, OAuth token), outputs (valid session + user object), success (full auth flows with audit records).
-- [ ] Implement design notes: use Better Auth's email+password provider and Prisma adapter for credential storage and sessions; maintain application domain models for Role/UserRole; prefer explicit linking UX for providers to avoid accidental merges.
+- [x] Define purpose and success criteria: inputs (email+password, passkey assertion, OAuth token), outputs (valid session + user object), success (full auth flows with audit records).
+- [x] Implement design notes: use Better Auth's email+password provider and Prisma adapter for credential storage and sessions; maintain application domain models for Role/UserRole; prefer explicit linking UX for providers to avoid accidental merges.
 
 ### 1.3 Better Auth: OAuth helper and session wiring
 
 Overall goal: Wire Better Auth for OAuth providers and session management, persisting to Prisma.
 
-- [ ] Use the Better Auth Prisma adapter to persist User, Session, Account, and Verification models; add models to `schema.prisma` and run migrations against a disposable database first.
-- [ ] Create `src/lib/auth.ts` and export a configured `auth` instance with emailAndPassword enabled and trusted origins.
-- [ ] Expose the Next.js API route at `src/app/api/auth/[...all]/route.ts` using `toNextJsHandler(auth)` from `better-auth/next-js`.
-- [ ] Configure OAuth provider credentials via env vars and implement explicit UI flow for linking/unlinking providers with audit entries.
-- [ ] Ensure security: never enable automatic provider-to-existing-account linking without verification for HIPAA-sensitive workflows.
+- [x] Use the Better Auth Prisma adapter to persist User, Session, Account, and Verification models; add models to `schema.prisma` and run migrations against a disposable database first.
+- [x] Create `src/lib/auth.ts` and export a configured `auth` instance with emailAndPassword enabled and trusted origins.
+- [x] Expose the Next.js API route at `src/app/api/auth/[...all]/route.ts` using `toNextJsHandler(auth)` from `better-auth/next-js`.
+- [x] Configure OAuth provider credentials via env vars and implement explicit UI flow for linking/unlinking providers with audit entries.
+- [x] Ensure security: never enable automatic provider-to-existing-account linking without verification for HIPAA-sensitive workflows.
 
 ### 1.4 Passkeys & TOTP (Better Auth plugins)
 
