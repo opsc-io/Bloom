@@ -2,6 +2,18 @@ import { betterAuth, boolean } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from '@/lib/prisma'
 import { admin } from 'better-auth/plugins/admin'
+import nodemailer from 'nodemailer'
+
+// SMTP2Go transporter for sending emails
+const transporter = nodemailer.createTransport({
+  host: 'mail.smtp2go.com',
+  port: 2525,
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASSWORD,
+  },
+})
 
 
 
@@ -30,6 +42,31 @@ export const auth = betterAuth({
   ].filter(Boolean),
   emailAndPassword: {
     enabled: true,
+    sendResetPassword: async ({ user, url }) => {
+      await transporter.sendMail({
+        from: '"Bloom Health" <noreply@bloomhealth.us>',
+        to: user.email,
+        subject: 'Reset your Bloom password',
+        html: `
+          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Reset Your Password</h2>
+            <p>Hi ${user.name || 'there'},</p>
+            <p>We received a request to reset your password. Click the button below to create a new password:</p>
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="${url}" style="background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Reset Password
+              </a>
+            </p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #666;">${url}</p>
+            <p>This link will expire in 1 hour.</p>
+            <p>If you didn't request this, you can safely ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+            <p style="color: #999; font-size: 12px;">Bloom Health</p>
+          </div>
+        `,
+      })
+    },
   },
   user: {
     additionalFields: {
