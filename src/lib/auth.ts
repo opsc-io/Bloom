@@ -1,21 +1,38 @@
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from '@/lib/prisma'
-import { admin } from 'better-auth/plugins/admin'
 import { twoFactor } from 'better-auth/plugins'
 import { createTransport } from 'nodemailer'
 
-// SMTP2GO transporter for password reset emails
-const transporter = createTransport({
-  host: 'mail.smtp2go.com',
-  port: 2525,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-})
+// Async email sender that loads env vars at call time
+async function sendEmail(options: {
+  to: string
+  subject: string
+  html: string
+}) {
+  // Read env vars at runtime, not at module load time
+  const smtpUser = process.env.SMTP_USER
+  const smtpPass = process.env.SMTP_PASSWORD
 
+  if (!smtpUser || !smtpPass) {
+    throw new Error('SMTP credentials not configured. Set SMTP_USER and SMTP_PASSWORD environment variables.')
+  }
+
+  const transporter = createTransport({
+    host: 'mail.smtp2go.com',
+    port: 2525,
+    secure: false,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  })
+
+  return transporter.sendMail({
+    from: '"Bloom Health" <noreply@bloomhealth.us>',
+    ...options,
+  })
+}
 
 
 // Handle dynamic Vercel URLs for preview deployments
@@ -45,9 +62,9 @@ export const auth = betterAuth({
   ].filter(Boolean),
   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: true,
     sendResetPassword: async ({ user, url }) => {
-      await transporter.sendMail({
-        from: '"Bloom Health" <noreply@bloomhealth.us>',
+      await sendEmail({
         to: user.email,
         subject: 'Reset your Bloom Health password',
         html: `
@@ -82,18 +99,6 @@ export const auth = betterAuth({
         type: 'string',
         input: true,
       },
-      therapist: {
-        type: 'boolean',
-        required: false,
-        input: false,
-        default: false
-      },
-      administrator: {
-        type: 'boolean',
-        required: false,
-        input: false,
-        default: false
-      },
     },
   },
   socialProviders: {
@@ -112,6 +117,34 @@ export const auth = betterAuth({
     zoom: {
       clientId: process.env.ZOOM_CLIENT_ID as string,
       clientSecret: process.env.ZOOM_CLIENT_SECRET as string,
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmail({
+        to: user.email,
+        subject: 'Verify your Bloom Health email',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Verify Your Email</h2>
+            <p>Hi ${user.name || 'there'},</p>
+            <p>Thanks for signing up for Bloom Health! Please verify your email address by clicking the button below:</p>
+            <p style="margin: 30px 0;">
+              <a href="${url}" style="background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Verify Email
+              </a>
+            </p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="color: #666; word-break: break-all;">${url}</p>
+            <p>This link will expire in 24 hours.</p>
+            <p>If you didn't create an account, you can safely ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+            <p style="color: #999; font-size: 12px;">Bloom Health</p>
+          </div>
+        `,
+      })
     },
   },
   plugins: [
@@ -133,8 +166,7 @@ export const auth = betterAuth({
       },
       otpOptions: {
         async sendOTP({ user, otp }) {
-          await transporter.sendMail({
-            from: '"Bloom Health" <noreply@bloomhealth.us>',
+          await sendEmail({
             to: user.email,
             subject: 'Your Bloom Health verification code',
             html: `

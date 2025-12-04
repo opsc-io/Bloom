@@ -200,7 +200,7 @@ export default function AccountPage() {
                 )}
 
                 <p className="text-xs text-muted-foreground text-center">
-                  When enabled, you'll receive a verification code via email each time you sign in.
+                  When enabled, you will receive a verification code via email each time you sign in.
                 </p>
               </div>
             </div>
