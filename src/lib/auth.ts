@@ -2,6 +2,7 @@ import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from '@/lib/prisma'
 import { admin } from 'better-auth/plugins/admin'
+import { twoFactor } from 'better-auth/plugins'
 import { createTransport } from 'nodemailer'
 
 // SMTP2GO transporter for password reset emails
@@ -112,6 +113,47 @@ export const auth = betterAuth({
       clientId: process.env.ZOOM_CLIENT_ID as string,
       clientSecret: process.env.ZOOM_CLIENT_SECRET as string,
     },
-
   },
+  plugins: [
+    twoFactor({
+      schema: {
+        user: {
+          fields: {
+            twoFactorEnabled: "twoFactorEnabled",
+          },
+        },
+        twoFactor: {
+          modelName: "twoFactor",
+          fields: {
+            secret: "secret",
+            backupCodes: "backupCodes",
+            userId: "userId",
+          },
+        },
+      },
+      otpOptions: {
+        async sendOTP({ user, otp }) {
+          await transporter.sendMail({
+            from: '"Bloom Health" <noreply@bloomhealth.us>',
+            to: user.email,
+            subject: 'Your Bloom Health verification code',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Verification Code</h2>
+                <p>Hi ${user.name || 'there'},</p>
+                <p>Your verification code is:</p>
+                <p style="font-size: 32px; font-weight: bold; color: #7c3aed; letter-spacing: 4px; margin: 30px 0;">
+                  ${otp}
+                </p>
+                <p>This code will expire in 5 minutes.</p>
+                <p>If you didn't request this code, please ignore this email.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+                <p style="color: #999; font-size: 12px;">Bloom Health</p>
+              </div>
+            `,
+          })
+        },
+      },
+    }),
+  ],
 })
