@@ -31,7 +31,7 @@ export async function POST(req: Request) {
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+    return NextResponse.json({ error: "Invalid request body. Expected JSON with a 'role' field set to 'patient' or 'practitioner'." }, { status: 400 });
   }
   if (body.role !== "patient" && body.role !== "practitioner") {
     return NextResponse.json({ error: "Invalid role. Must be either 'patient' or 'practitioner'." }, { status: 400 });
