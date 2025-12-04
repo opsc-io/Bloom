@@ -1,7 +1,19 @@
-import { betterAuth, boolean } from 'better-auth'
+import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from '@/lib/prisma'
 import { admin } from 'better-auth/plugins/admin'
+import { createTransport } from 'nodemailer'
+
+// SMTP2GO transporter for password reset emails
+const transporter = createTransport({
+  host: 'mail.smtp2go.com',
+  port: 2525,
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASSWORD,
+  },
+})
 
 
 
@@ -17,6 +29,8 @@ const getBaseURL = () => {
 }
 
 export const auth = betterAuth({
+  secret: process.env.BETTER_AUTH_SECRET,
+  experimental: { joins: true },
   baseURL: getBaseURL(),
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
@@ -30,6 +44,31 @@ export const auth = betterAuth({
   ].filter(Boolean),
   emailAndPassword: {
     enabled: true,
+    sendResetPassword: async ({ user, url }) => {
+      await transporter.sendMail({
+        from: '"Bloom Health" <noreply@bloomhealth.us>',
+        to: user.email,
+        subject: 'Reset your Bloom Health password',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Reset Your Password</h2>
+            <p>Hi ${user.name || 'there'},</p>
+            <p>We received a request to reset your password. Click the button below to create a new password:</p>
+            <p style="margin: 30px 0;">
+              <a href="${url}" style="background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Reset Password
+              </a>
+            </p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="color: #666; word-break: break-all;">${url}</p>
+            <p>This link will expire in 1 hour.</p>
+            <p>If you didn't request this, you can safely ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+            <p style="color: #999; font-size: 12px;">Bloom Health</p>
+          </div>
+        `,
+      })
+    },
   },
   user: {
     additionalFields: {
