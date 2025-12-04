@@ -16,17 +16,19 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar"
 import { Skeleton } from "@/components/ui/skeleton"
-
+import { Input } from "@/components/ui/input"
+import { Search } from "lucide-react"
 
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 
 
 export default function DashboardPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -46,7 +48,7 @@ export default function DashboardPage() {
       <AppSidebar user={user}
       />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2">
+        <header className="flex h-16 shrink-0 items-center gap-2 justify-between">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator
@@ -63,6 +65,17 @@ export default function DashboardPage() {
                 <BreadcrumbSeparator className="hidden md:block" />
               </BreadcrumbList>
             </Breadcrumb>
+          </div>
+          <div className="flex items-center gap-2 px-4">
+            <div className="relative w-64">
+              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search therapists..."
+                className="pl-8"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
           </div>
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
