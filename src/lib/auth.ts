@@ -1,7 +1,7 @@
 import { betterAuth, boolean } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from '@/lib/prisma'
-import { admin } from 'better-auth/plugins/admin'
+
 
 
 
@@ -17,6 +17,7 @@ const getBaseURL = () => {
 }
 
 export const auth = betterAuth({
+  experimental: { joins: true },
   baseURL: getBaseURL(),
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
@@ -42,17 +43,10 @@ export const auth = betterAuth({
         type: 'string',
         input: true,
       },
-      therapist: {
-        type: 'boolean',
-        required: false,
+      role: {
+        type: 'string',
         input: false,
-        default: false
-      },
-      administrator: {
-        type: 'boolean',
-        required: false,
-        input: false,
-        default: false
+        default: 'UNSET',
       },
     },
   },
@@ -72,6 +66,12 @@ export const auth = betterAuth({
     zoom: {
       clientId: process.env.ZOOM_CLIENT_ID as string,
       clientSecret: process.env.ZOOM_CLIENT_SECRET as string,
+      mapProfileToUser: (profile) => ({
+        firstname: profile.first_name,
+        lastname: profile.last_name ? profile.last_name : " ",
+        email: profile.email,
+        avatarUrl: profile.picture,
+      }),
     },
 
   },

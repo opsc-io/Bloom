@@ -22,7 +22,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Users, UserCheck, ShieldCheck, Activity, TrendingUp, Clock, BarChart3, ExternalLink,
   Search, Maximize2, Minimize2, MessageSquare, Send
@@ -67,6 +67,10 @@ const COLORS = ["#0088FE", "#00C49F", "#FFBB28", "#FF8042"];
 export default function DashboardPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
+  const [roleDialogOpen, setRoleDialogOpen] = useState(false);
+  const [roleError, setRoleError] = useState<string | null>(null);
+  const [isSavingRole, setIsSavingRole] = useState(false);
+  const [roleAcknowledged, setRoleAcknowledged] = useState(false);
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [statsError, setStatsError] = useState<string | null>(null);
@@ -81,6 +85,41 @@ export default function DashboardPage() {
     }
   }, [isPending, session, router]);
 
+  const shouldPromptForRole = useMemo(() => {
+    if (!session?.user) return false;
+    const role = (session.user as { role?: string | null }).role ?? "UNSET";
+    return role === "UNSET" || !role;
+  }, [session]);
+
+  useEffect(() => {
+    if (shouldPromptForRole && !roleAcknowledged) {
+      setRoleDialogOpen(true);
+    }
+  }, [shouldPromptForRole, roleAcknowledged]);
+
+  async function handleRoleSelect(role: "practitioner" | "patient") {
+    setRoleError(null);
+    setIsSavingRole(true);
+    try {
+      const res = await fetch("/api/user/role", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setRoleError(body.error ?? "Unable to save your role. Please try again.");
+      } else {
+        setRoleDialogOpen(false);
+        setRoleAcknowledged(true);
+        router.refresh();
+      }
+    } catch (err) {
+      setRoleError("Unable to save your role. Please try again.");
+    } finally {
+      setIsSavingRole(false);
+    }
+  }
   // Fetch admin stats when user is admin
   useEffect(() => {
     const fetchStats = async () => {
@@ -288,6 +327,46 @@ export default function DashboardPage() {
                     </div>
                   </CardHeader>
                   <CardContent>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {mockConversations.length > 0 ? (
+                        mockConversations.map((conv) => (
+                          <div key={conv.id} className="relative">
+                            <Avatar className="h-12 w-12 cursor-pointer hover:scale-110 transition-transform">
+                              <AvatarFallback className={`${conv.avatarColor} text-white font-semibold`}>
+                                {conv.avatar}
+                              </AvatarFallback>
+                            </Avatar>
+                            {conv.unread > 0 && (
+                              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold border-2 border-background">
+                                {conv.unread}
+                              </span>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-sm text-muted-foreground py-4">No messages yet</p>
+                      )}
+                    </div>
+                  </CardContent>
+                </>
+              ) : (
+                // Expanded Full-Screen Chat View
+                <div className="flex h-screen">
+                  {/* Left Sidebar - Conversations List */}
+                  <div className="w-80 border-r bg-muted/30 flex flex-col">
+                    <div className="p-4 border-b">
+                      <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-2xl font-bold">Chats</h2>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsExpanded(false);
+                          }}
+                        >
+                          <Minimize2 className="h-4 w-4" />
+                        </Button>
                     {statsLoading ? (
                       <Skeleton className="h-[200px] w-full" />
                     ) : statsError ? (
@@ -689,6 +768,34 @@ export default function DashboardPage() {
           )}
         </div>
       </SidebarInset>
+      {roleDialogOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-md rounded-lg bg-background p-6 shadow-lg">
+            <h2 className="text-lg font-semibold">Tell us about you</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Are you using Bloom as a practitioner or a patient? We use this to tailor your dashboard.
+            </p>
+            {roleError ? (
+              <p className="mt-3 text-sm text-red-500">{roleError}</p>
+            ) : null}
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <Button
+                onClick={() => handleRoleSelect("practitioner")}
+                disabled={isSavingRole}
+              >
+                I am a Practitioner
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleRoleSelect("patient")}
+                disabled={isSavingRole}
+              >
+                I am a Patient
+              </Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </SidebarProvider>
   )
 }
