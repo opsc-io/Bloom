@@ -1,4 +1,5 @@
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { Search, Maximize2, Minimize2, MessageSquare, Send } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -33,6 +34,11 @@ type DashboardMessagingCardProps = {
 
 export function DashboardMessagingCard({ conversations, messages }: DashboardMessagingCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const router = useRouter()
+
+  const handleExpand = () => {
+    router.push('/messages')
+  }
 
   return (
     <Card
@@ -40,7 +46,7 @@ export function DashboardMessagingCard({ conversations, messages }: DashboardMes
         ? 'fixed inset-0 z-50 rounded-none border-0 md:col-span-1'
         : 'md:col-span-1 aspect-video cursor-pointer hover:shadow-lg'
         }`}
-      onClick={() => !isExpanded && setIsExpanded(true)}
+      onClick={() => !isExpanded && handleExpand()}
     >
       {!isExpanded ? (
         <div>
@@ -58,7 +64,14 @@ export function DashboardMessagingCard({ conversations, messages }: DashboardMes
             <div className="flex items-center gap-3 flex-wrap">
               {conversations.length > 0 ? (
                 conversations.map((conv) => (
-                  <div key={conv.id} className="relative">
+                  <div 
+                    key={conv.id} 
+                    className="relative"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(`/messages?message=${conv.id}`);
+                    }}
+                  >
                     <Avatar className="h-12 w-12 cursor-pointer hover:scale-110 transition-transform">
                       <AvatarFallback className={`${conv.avatarColor} text-white font-semibold`}>
                         {conv.avatar}
