@@ -141,7 +141,7 @@ export default function ProfileViewPage({ params }: { params: Promise<{ userId: 
                       {/* Message Button - Only show if viewing someone else's profile */}
                       {session?.user?.id !== userId && (
                         <Button 
-                          onClick={() => router.push(`/dashboard?message=${userId}`)}
+                          onClick={() => router.push(`/messages?message=${userId}`)}
                           className="mt-2"
                         >
                           <MessageCircle className="h-4 w-4 mr-2" />
