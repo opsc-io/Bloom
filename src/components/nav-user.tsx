@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import { signOut } from "@/lib/auth-client"
+import { useRouter } from "next/navigation"
 
 import {
   Avatar,
@@ -42,6 +43,7 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
   const displayName = [user.firstname, user.lastname].join(" ").trim() || "User"
   const displayEmail = user.email ?? ""
   const fallbackInitial =
@@ -98,7 +100,7 @@ export function NavUser({
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/profile")}>
                 <BadgeCheck />
                 Account
               </DropdownMenuItem>
