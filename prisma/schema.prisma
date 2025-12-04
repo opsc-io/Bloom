@@ -109,7 +109,7 @@ model Verification {
   @@map("verification")
 }
 
-model logs {
+model Log {
   id        String   @id
   level     String
   userId    String?
