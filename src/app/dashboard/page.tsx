@@ -6,7 +6,7 @@ import {
   BreadcrumbItem,
   BreadcrumbLink,
   BreadcrumbList,
-  //BreadcrumbPage,
+  BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
@@ -48,8 +48,8 @@ export default function DashboardPage() {
       <AppSidebar user={user}
       />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 justify-between">
-          <div className="flex items-center gap-2 px-4">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b px-4 justify-between">
+          <div className="flex items-center gap-2">
             <SidebarTrigger className="-ml-1" />
             <Separator
               orientation="vertical"
@@ -59,14 +59,17 @@ export default function DashboardPage() {
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
                   <BreadcrumbLink href="#">
-                    Dashboard
+                    Building Your Application
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
-          <div className="flex items-center gap-2 px-4">
+          <div className="flex items-center gap-2">
             <div className="relative w-64">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
@@ -78,7 +81,7 @@ export default function DashboardPage() {
             </div>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        <div className="flex flex-1 flex-col gap-3 p-4 pt-4">
           <div className="grid auto-rows-min gap-4 md:grid-cols-3">
             <Skeleton className="bg-muted/50 aspect-video rounded-xl" />
             <Skeleton className="bg-muted/50 aspect-video rounded-xl" />
