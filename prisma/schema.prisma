@@ -189,6 +189,8 @@ model MessageAttachment {
   sizeBytes Int
 
   message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
 }
 
 // Emoji reactions
