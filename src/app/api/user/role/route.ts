@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { headers } from "next/headers";
 import prisma from "@/lib/prisma";
+import { UserRole } from "@/generated/prisma/client";
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,11 +24,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Update user role
+    const roleValue = role === "practitioner" ? UserRole.THERAPIST : UserRole.PATIENT;
+
     await prisma.user.update({
       where: { id: session.user.id },
       data: {
-        therapist: role === "practitioner",
+        role: roleValue,
+        therapist: roleValue === UserRole.THERAPIST,
       },
     });
 
