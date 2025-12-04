@@ -25,7 +25,6 @@ import { Search, Maximize2, Minimize2, MessageSquare, Send } from "lucide-react"
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { useEffect, useMemo, useState } from "react";
-import { Button } from "@/components/ui/button";
 
 
 
@@ -212,7 +211,7 @@ export default function DashboardPage() {
                       <div className="flex items-center justify-between mb-4">
                         <h2 className="text-2xl font-bold">Chats</h2>
                         <Button
-                          size="icon-sm"
+                          size="sm"
                           variant="ghost"
                           onClick={(e) => {
                             e.stopPropagation();
