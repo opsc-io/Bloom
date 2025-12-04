@@ -217,7 +217,7 @@ export default function DashboardPage() {
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           {isAdmin ? (
-            <>
+            <div>
               {/* Admin Dashboard - Stats Cards */}
               <div className="grid auto-rows-min gap-4 md:grid-cols-3">
                 <Card>
@@ -229,12 +229,12 @@ export default function DashboardPage() {
                     {statsLoading ? (
                       <Skeleton className="h-8 w-20" />
                     ) : (
-                      <>
+                      <div>
                         <div className="text-2xl font-bold">{stats?.overview.totalUsers ?? 0}</div>
                         <p className="text-xs text-muted-foreground">
                           +{stats?.overview.newUsersThisWeek ?? 0} this week
                         </p>
-                      </>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -248,10 +248,10 @@ export default function DashboardPage() {
                     {statsLoading ? (
                       <Skeleton className="h-8 w-20" />
                     ) : (
-                      <>
+                      <div>
                         <div className="text-2xl font-bold">{stats?.overview.therapistCount ?? 0}</div>
                         <p className="text-xs text-muted-foreground">Active practitioners</p>
-                      </>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -265,10 +265,10 @@ export default function DashboardPage() {
                     {statsLoading ? (
                       <Skeleton className="h-8 w-20" />
                     ) : (
-                      <>
+                      <div>
                         <div className="text-2xl font-bold">{stats?.overview.activeSessions ?? 0}</div>
                         <p className="text-xs text-muted-foreground">Currently logged in</p>
-                      </>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -497,9 +497,9 @@ export default function DashboardPage() {
                   )}
                 </CardContent>
               </Card>
-            </>
+            </div>
           ) : (
-            <>
+            <div>
               {/* Regular User Dashboard - Messages UI */}
               <div className="grid auto-rows-min gap-4 md:grid-cols-3">
                 {/* Chat Messages Preview Box */}
@@ -513,7 +513,7 @@ export default function DashboardPage() {
                 >
                   {!isExpanded ? (
                     // Collapsed Preview View
-                    <>
+                    <div>
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -546,7 +546,7 @@ export default function DashboardPage() {
                           )}
                         </div>
                       </CardContent>
-                    </>
+                    </div>
                   ) : (
                     // Expanded Full-Screen Chat View
                     <div className="flex h-screen">
@@ -685,7 +685,7 @@ export default function DashboardPage() {
                 <Skeleton className="bg-muted/50 aspect-video rounded-xl" />
               </div>
               <Skeleton className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
-            </>
+            </div>
           )}
         </div>
       </SidebarInset>
