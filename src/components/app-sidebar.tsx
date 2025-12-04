@@ -133,6 +133,7 @@ const data = {
 
 type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
   user?: {
+    id?: string
     name?: string | null
     email?: string | null
     avatar?: string | null
@@ -142,6 +143,7 @@ type AppSidebarProps = React.ComponentProps<typeof Sidebar> & {
 export function AppSidebar({ user, ...props }: AppSidebarProps) {
   const userData =
     user ?? {
+      id: "",
       name: "User",
       email: "",
       avatar: "",
