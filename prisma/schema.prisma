@@ -32,32 +32,30 @@ model User {
   messages                 Message[]
   messageReactions         MessageReaction[]
 
-  is_therapist     Boolean? @default(false)
-  is_administrator Boolean? @default(false)
-
+  role UserRole @default(UNSET)
   name String
 
-  paymentMethods        PaymentMethod[]
-  payments              Payment[]
-  claimsAsPatient       Claim[]              @relation("ClaimPatient")
-  claimsAsTherapist     Claim[]              @relation("ClaimTherapist")
+  paymentMethods    PaymentMethod[]
+  payments          Payment[]
+  claimsAsPatient   Claim[]         @relation("ClaimPatient")
+  claimsAsTherapist Claim[]         @relation("ClaimTherapist")
 
-  appointmentsAsTherapist Appointment[]      @relation("AppointmentTherapist")
-  appointmentsAsPatient   Appointment[]      @relation("AppointmentPatient")
+  appointmentsAsTherapist Appointment[] @relation("AppointmentTherapist")
+  appointmentsAsPatient   Appointment[] @relation("AppointmentPatient")
 
-  appointmentNotes AppointmentNote[]         @relation("AppointmentNoteAuthor")
-  waitlistRequests WaitlistEntry[]           @relation("WaitlistPatient")
-  waitlistOffers   WaitlistEntry[]           @relation("WaitlistTherapist")
+  appointmentNotes AppointmentNote[] @relation("AppointmentNoteAuthor")
+  waitlistRequests WaitlistEntry[]   @relation("WaitlistPatient")
+  waitlistOffers   WaitlistEntry[]   @relation("WaitlistTherapist")
 
-  fileAssetsOwned    FileAsset[]             @relation("FileOwner")
-  fileAssetsUploaded FileAsset[]             @relation("FileUploader")
-  fileSharesReceived FileShare[]             @relation("FileShareRecipient")
+  fileAssetsOwned    FileAsset[] @relation("FileOwner")
+  fileAssetsUploaded FileAsset[] @relation("FileUploader")
+  fileSharesReceived FileShare[] @relation("FileShareRecipient")
 
   therapistProfile      TherapistProfile?
   patientMedicalProfile PatientMedicalProfile?
 
-  supportTicketsCreated  SupportTicket[]     @relation("TicketCreator")
-  supportTicketsAssigned SupportTicket[]     @relation("TicketAssignee")
+  supportTicketsCreated  SupportTicket[] @relation("TicketCreator")
+  supportTicketsAssigned SupportTicket[] @relation("TicketAssignee")
 
   @@unique([email])
   @@map("user")
@@ -127,6 +125,8 @@ model logs {
 enum UserRole {
   THERAPIST
   PATIENT
+  ADMINISTRATOR
+  UNSET
 }
 
 // Conversations
@@ -336,7 +336,7 @@ model AppointmentNote {
   appointmentId  String
   authorId       String
   content        String
-  previousNoteId String? @unique
+  previousNoteId String?  @unique
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 

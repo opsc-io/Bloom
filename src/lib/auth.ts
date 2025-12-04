@@ -43,17 +43,10 @@ export const auth = betterAuth({
         type: 'string',
         input: true,
       },
-      is_therapist: {
-        type: 'boolean',
-        required: false,
+      role: {
+        type: 'string',
         input: false,
-        defaultValue: false
-      },
-      is_administrator: {
-        type: 'boolean',
-        required: false,
-        input: false,
-        defaultValue: false
+        default: 'UNSET',
       },
     },
   },
@@ -73,6 +66,12 @@ export const auth = betterAuth({
     zoom: {
       clientId: process.env.ZOOM_CLIENT_ID as string,
       clientSecret: process.env.ZOOM_CLIENT_SECRET as string,
+      mapProfileToUser: (profile) => ({
+        firstname: profile.first_name,
+        lastname: profile.last_name ? profile.last_name : " ",
+        email: profile.email,
+        avatarUrl: profile.picture,
+      }),
     },
 
   },

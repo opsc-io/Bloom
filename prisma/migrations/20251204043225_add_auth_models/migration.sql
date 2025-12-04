@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "UserRole" AS ENUM ('THERAPIST', 'PATIENT');
+CREATE TYPE "UserRole" AS ENUM ('THERAPIST', 'PATIENT', 'ADMINISTRATOR', 'UNSET');
 
 -- CreateEnum
 CREATE TYPE "PaymentMethodType" AS ENUM ('CARD', 'BANK_TRANSFER', 'FSA', 'HSA');
@@ -41,8 +41,7 @@ CREATE TABLE "user" (
     "image" STRING,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "is_therapist" BOOL DEFAULT false,
-    "is_administrator" BOOL DEFAULT false,
+    "role" "UserRole" NOT NULL DEFAULT 'UNSET',
     "name" STRING NOT NULL,
 
     CONSTRAINT "user_pkey" PRIMARY KEY ("id")
