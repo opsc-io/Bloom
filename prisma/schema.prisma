@@ -64,6 +64,8 @@ model User {
   therapist     Boolean?
   administrator Boolean?
 
+  bio String?
+
   @@unique([email])
   @@map("user")
 }

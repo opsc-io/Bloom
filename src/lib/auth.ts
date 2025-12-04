@@ -104,6 +104,10 @@ export const auth = betterAuth({
         input: false,
         default: 'UNSET',
       },
+      bio: {
+        type: 'string',
+        input: true,
+      },
     },
   },
   socialProviders: {

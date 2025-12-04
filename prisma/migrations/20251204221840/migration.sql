@@ -43,6 +43,7 @@ CREATE TABLE "user" (
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "role" "UserRole" NOT NULL DEFAULT 'UNSET',
     "name" STRING NOT NULL,
+    "bio" STRING,
     "twoFactorEnabled" BOOL DEFAULT false,
     "therapist" BOOL,
     "administrator" BOOL,

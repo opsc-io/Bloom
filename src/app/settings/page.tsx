@@ -31,7 +31,13 @@ import { Upload } from "lucide-react";
 export default function ProfilePage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
-  const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [profileSaved, setProfileSaved] = useState(false);
+  const [passwordSaved, setPasswordSaved] = useState(false);
   
   // Profile form state
   const [firstname, setFirstname] = useState("");
@@ -56,10 +62,47 @@ export default function ProfilePage() {
     }
   }, [isPending, session, router]);
 
+  useEffect(() => {
+    if (isPending || !session?.user) return;
+    let cancelled = false;
+
+    const loadProfile = async () => {
+      setIsLoadingProfile(true);
+      setProfileError(null);
+      try {
+        const res = await fetch("/api/user/settings");
+        if (!res.ok) {
+          throw new Error("Failed to fetch profile");
+        }
+        const data = await res.json();
+        if (cancelled) return;
+        setFirstname(data?.user?.firstname ?? "");
+        setLastname(data?.user?.lastname ?? "");
+        setEmail(data?.user?.email ?? "");
+        setBio(data?.user?.bio ?? "");
+      } catch (err) {
+        if (!cancelled) {
+          setProfileError("Unable to load profile right now. Please try again.");
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoadingProfile(false);
+        }
+      }
+    };
+
+    loadProfile();
+    return () => {
+      cancelled = true;
+    };
+  }, [isPending, session]);
+
   const handleProfileSave = async () => {
-    setIsSaving(true);
+    setProfileError(null);
+    setProfileSaved(false);
+    setIsSavingProfile(true);
     try {
-      const response = await fetch("/api/user/profile", {
+      const response = await fetch("/api/user/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -70,15 +113,22 @@ export default function ProfilePage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to update profile");
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to update profile");
       }
 
+      setProfileSaved(true);
       // Refresh session
       router.refresh();
     } catch (error) {
       console.error("Error updating profile:", error);
+      setProfileError(
+        error instanceof Error
+          ? error.message
+          : "Error updating profile. Please try again."
+      );
     } finally {
-      setIsSaving(false);
+      setIsSavingProfile(false);
     }
   };
 
@@ -88,7 +138,9 @@ export default function ProfilePage() {
       return;
     }
 
-    setIsSaving(true);
+    setPasswordError(null);
+    setPasswordSaved(false);
+    setIsSavingPassword(true);
     try {
       const response = await fetch("/api/user/password", {
         method: "POST",
@@ -100,16 +152,23 @@ export default function ProfilePage() {
       });
 
       if (!response.ok) {
-        throw new Error("Failed to change password");
+          const body = await response.json().catch(() => ({}));
+          throw new Error(body.error || "Failed to change password");
       }
 
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+      setPasswordSaved(true);
     } catch (error) {
       console.error("Error changing password:", error);
+      setPasswordError(
+        error instanceof Error
+          ? error.message
+          : "Error changing password. Please try again."
+      );
     } finally {
-      setIsSaving(false);
+      setIsSavingPassword(false);
     }
   };
 
@@ -190,6 +249,7 @@ export default function ProfilePage() {
                           <Label htmlFor="firstname">First Name</Label>
                           <Input
                             id="firstname"
+                            disabled={isLoadingProfile}
                             value={firstname}
                             onChange={(e) => setFirstname(e.target.value)}
                           />
@@ -198,6 +258,7 @@ export default function ProfilePage() {
                           <Label htmlFor="lastname">Last Name</Label>
                           <Input
                             id="lastname"
+                            disabled={isLoadingProfile}
                             value={lastname}
                             onChange={(e) => setLastname(e.target.value)}
                           />
@@ -210,6 +271,7 @@ export default function ProfilePage() {
                         <Textarea
                           id="bio"
                           placeholder="Tell us a little about yourself..."
+                          disabled={isLoadingProfile}
                           value={bio}
                           onChange={(e) => setBio(e.target.value)}
                           rows={4}
@@ -219,9 +281,16 @@ export default function ProfilePage() {
                         </p>
                       </div>
 
+                      {profileError ? (
+                        <p className="text-sm text-destructive">{profileError}</p>
+                      ) : null}
+                      {profileSaved ? (
+                        <p className="text-sm text-emerald-600">Profile updated.</p>
+                      ) : null}
+
                       <div className="flex justify-end">
-                        <Button onClick={handleProfileSave} disabled={isSaving}>
-                          {isSaving ? "Saving..." : "Save Changes"}
+                        <Button onClick={handleProfileSave} disabled={isSavingProfile || isLoadingProfile}>
+                          {isSavingProfile ? "Saving..." : "Save Changes"}
                         </Button>
                       </div>
                     </CardContent>
@@ -265,6 +334,7 @@ export default function ProfilePage() {
                         <Input
                           id="current-password"
                           type="password"
+                          autoComplete="current-password"
                           value={currentPassword}
                           onChange={(e) => setCurrentPassword(e.target.value)}
                         />
@@ -274,6 +344,7 @@ export default function ProfilePage() {
                         <Input
                           id="new-password"
                           type="password"
+                          autoComplete="new-password"
                           value={newPassword}
                           onChange={(e) => setNewPassword(e.target.value)}
                         />
@@ -283,13 +354,22 @@ export default function ProfilePage() {
                         <Input
                           id="confirm-password"
                           type="password"
+                          autoComplete="new-password"
                           value={confirmPassword}
                           onChange={(e) => setConfirmPassword(e.target.value)}
                         />
                       </div>
+
+                      {passwordError ? (
+                        <p className="text-sm text-destructive">{passwordError}</p>
+                      ) : null}
+                      {passwordSaved ? (
+                        <p className="text-sm text-emerald-600">Password updated.</p>
+                      ) : null}
+
                       <div className="flex justify-end">
-                        <Button onClick={handlePasswordChange} disabled={isSaving}>
-                          {isSaving ? "Updating..." : "Update Password"}
+                        <Button onClick={handlePasswordChange} disabled={isSavingPassword}>
+                          {isSavingPassword ? "Updating..." : "Update Password"}
                         </Button>
                       </div>
                     </CardContent>
