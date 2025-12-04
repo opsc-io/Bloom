@@ -25,6 +25,7 @@ type LoginFormProps = React.ComponentProps<"div"> & {
   error?: string | null
   isSubmitting?: boolean
   onGoogleSignIn?: () => void
+  onZoomSignIn?: () => void
 }
 
 export function LoginForm({
@@ -33,6 +34,7 @@ export function LoginForm({
   error,
   isSubmitting = false,
   onGoogleSignIn,
+  onZoomSignIn,
   ...props
 }: LoginFormProps) {
   return (
@@ -48,7 +50,12 @@ export function LoginForm({
           <form onSubmit={onSubmit}>
             <FieldGroup>
               <Field>
-                <Button variant="outline" type="button">
+                <Button
+                  variant="outline"
+                  type="button"
+                  onClick={onZoomSignIn}
+                  disabled={isSubmitting}
+                >
                   <VideoConferenceIcon />
                   Login with Zoom
                 </Button>

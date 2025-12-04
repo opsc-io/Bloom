@@ -46,6 +46,17 @@ export default function LoginPage() {
     }
   }
 
+  async function handleZoomSignIn() {
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await signIn.social({ provider: "zoom" });
+    } catch (err) {
+      setError("Unable to start Zoom sign in. Please try again.");
+      setIsSubmitting(false);
+    }
+  }
+
   return (
 
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
@@ -56,6 +67,7 @@ export default function LoginPage() {
         <LoginForm
           onSubmit={(e) => handleSubmit(e as unknown as React.FormEvent<HTMLFormElement>)}
           onGoogleSignIn={handleGoogleSignIn}
+          onZoomSignIn={handleZoomSignIn}
           error={error}
           isSubmitting={isSubmitting}
         />
