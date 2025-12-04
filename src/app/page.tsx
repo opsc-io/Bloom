@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import { useSession } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import Image from "next/image";
 import { 
   Calendar, 
   CreditCard, 
@@ -75,8 +76,7 @@ export default function Home() {
       <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Sparkles className="h-6 w-6 text-primary" />
-            <span className="font-bold text-xl">Bloom</span>
+            <Image src="/logo.svg" alt="Bloom Logo" width={120} height={40} className="h-8 w-auto" />
           </div>
           <div className="flex items-center gap-3">
             <Button
@@ -229,8 +229,7 @@ export default function Home() {
         <div className="container mx-auto px-4 py-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
-              <span className="font-semibold">Bloom</span>
+              <Image src="/logo.svg" alt="Bloom Logo" width={100} height={33} className="h-6 w-auto" />
               <span className="text-sm text-muted-foreground">— Therapy Practice Platform</span>
             </div>
             <p className="text-sm text-muted-foreground">
