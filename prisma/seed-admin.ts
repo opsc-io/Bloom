@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '../src/generated/prisma/client.ts';
+import { PrismaClient, UserRole } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { hashPassword } from 'better-auth/crypto';
 
