@@ -39,13 +39,18 @@ export default function SignUpPage() {
             return;
         }
 
-        const res = await signUp.email({
+        const res = await (signUp.email as (params: {
+            name: string;
+            email: string;
+            password: string;
+            firstname?: string;
+            lastname?: string;
+        }) => Promise<{ error?: { message?: string } }>)({
             name: `${(formData.get("firstName") as string) || ""} ${(formData.get("lastName") as string) || ""}`.trim(),
             email,
             password,
             firstname: (formData.get("firstName") as string) || "",
             lastname: (formData.get("lastName") as string) || "",
-            bio: "",
         });
 
         if (res.error) {
