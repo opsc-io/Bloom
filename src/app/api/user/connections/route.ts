@@ -13,6 +13,7 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const userId = session.user.id;
     const userRole = (session.user as { role?: string }).role;
 
     const people: Array<{
@@ -24,50 +25,70 @@ export async function GET() {
     }> = [];
 
     if (userRole === "THERAPIST") {
-      const patients = await prisma.user.findMany({
-        where: { role: "PATIENT" },
+      // all distinct patients with appointments with this therapist
+      const patients = await prisma.appointment.findMany({
+        where: { therapistId: userId },
         select: {
-          id: true,
-          firstname: true,
-          lastname: true,
-          email: true,
-          image: true,
-          role: true,
+          patient: {
+            select: {
+              id: true,
+              firstname: true,
+              lastname: true,
+              email: true,
+              image: true,
+              role: true,
+            },
+          },
         },
-        orderBy: { createdAt: "desc" },
-        take: 200,
+        orderBy: { startAt: "desc" },
+        take: 500,
       });
-      patients.forEach((p) => {
-        people.push({
-          id: p.id,
-          name: p.firstname || p.lastname ? `${p.firstname} ${p.lastname}`.trim() : p.email,
-          email: p.email,
-          image: p.image,
-          role: p.role,
-        });
+      const seen = new Set<string>();
+      patients.forEach((appt) => {
+        const p = appt.patient;
+        if (p && !seen.has(p.id)) {
+          seen.add(p.id);
+          people.push({
+            id: p.id,
+            name: p.firstname || p.lastname ? `${p.firstname} ${p.lastname}`.trim() : p.email,
+            email: p.email,
+            image: p.image,
+            role: p.role,
+          });
+        }
       });
     } else if (userRole === "PATIENT") {
-      const therapists = await prisma.user.findMany({
-        where: { role: "THERAPIST" },
+      // all distinct therapists this patient has seen or has appointments with
+      const therapists = await prisma.appointment.findMany({
+        where: { patientId: userId },
         select: {
-          id: true,
-          firstname: true,
-          lastname: true,
-          email: true,
-          image: true,
-          role: true,
+          therapist: {
+            select: {
+              id: true,
+              firstname: true,
+              lastname: true,
+              email: true,
+              image: true,
+              role: true,
+            },
+          },
         },
-        orderBy: { createdAt: "desc" },
-        take: 50,
+        orderBy: { startAt: "desc" },
+        take: 200,
       });
-      therapists.forEach((t) => {
-        people.push({
-          id: t.id,
-          name: t.firstname || t.lastname ? `${t.firstname} ${t.lastname}`.trim() : t.email,
-          email: t.email,
-          image: t.image,
-          role: t.role,
-        });
+      const seen = new Set<string>();
+      therapists.forEach((appt) => {
+        const t = appt.therapist;
+        if (t && !seen.has(t.id)) {
+          seen.add(t.id);
+          people.push({
+            id: t.id,
+            name: t.firstname || t.lastname ? `${t.firstname} ${t.lastname}`.trim() : t.email,
+            email: t.email,
+            image: t.image,
+            role: t.role,
+          });
+        }
       });
     }
 
