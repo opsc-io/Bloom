@@ -28,7 +28,7 @@ export function DashboardPeopleCard({ people, userRole }: DashboardPeopleCardPro
   const Icon = isTherapist ? Users : User;
 
   return (
-    <Card className="bg-card/50 backdrop-blur-sm border-border/50 hover:bg-card/60 transition-all hover:shadow-lg aspect-video flex flex-col">
+    <Card className="bg-card/50 backdrop-blur-sm border-border/50 hover:bg-card/60 transition-all hover:shadow-lg flex flex-col h-full">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="space-y-1">
