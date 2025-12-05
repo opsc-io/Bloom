@@ -500,8 +500,19 @@ function MessagesContent() {
                         ))}
 
                         {isTyping && (
-                          <div className="flex gap-3 justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
-                            <div className="flex flex-col gap-1 items-end">
+                          <div className="flex gap-3 justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <Avatar className="h-8 w-8 animate-in zoom-in duration-300">
+                              <AvatarFallback className="bg-blue-500">
+                                {typingEntry?.name
+                                  ? typingEntry.name
+                                      .split(" ")
+                                      .map((n) => n[0])
+                                      .join("")
+                                      .toUpperCase()
+                                  : "T"}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex flex-col gap-1 items-start">
                               <div className="rounded-lg px-4 py-3 bg-primary/10 border border-primary/20">
                                 <div className="flex gap-1.5">
                                   <span
@@ -519,15 +530,6 @@ function MessagesContent() {
                                 </div>
                               </div>
                             </div>
-                            <Avatar className="h-8 w-8 animate-in zoom-in duration-300">
-                              <AvatarFallback className="bg-blue-500">
-                                {(
-                                  (user as any)?.firstname?.[0] ||
-                                  (user as any)?.name?.[0] ||
-                                  "Y"
-                                ).toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
                           </div>
                         )}
                       </div>
