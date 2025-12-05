@@ -50,7 +50,7 @@ export default function AdminPage() {
   }, [isPending, session, router]);
 
   // Check if user is administrator
-  const isAdmin = session?.user?.administrator === true;
+  const isAdmin = (session?.user as { administrator?: boolean } | undefined)?.administrator === true;
 
   if (isPending)
     return <p className="text-center mt-8 text-white">Loading...</p>;
