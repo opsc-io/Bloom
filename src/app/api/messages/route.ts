@@ -34,7 +34,7 @@ export async function GET(req: Request) {
     include: {
       participants: { include: { user: true } },
       messages: {
-        include: { sender: true },
+        include: { sender: true, reactions: true },
         orderBy: { createdAt: "desc" },
         take: 1,
       },
@@ -76,28 +76,39 @@ export async function GET(req: Request) {
     isMe: boolean;
     avatar: string;
     avatarColor: string;
+    reactions: { emoji: string; count: number }[];
   }> = [];
 
   if (activeConversationId) {
     const messages = await prisma.message.findMany({
       where: { conversationId: activeConversationId },
-      include: { sender: true },
+      include: { sender: true, reactions: true },
       orderBy: { createdAt: "asc" },
       take: 30,
     });
 
-    mappedMessages = messages.map((msg) => ({
-      id: msg.id,
-      sender:
-        msg.sender.firstname || msg.sender.lastname
-          ? `${msg.sender.firstname} ${msg.sender.lastname}`.trim()
-          : msg.sender.email,
-      message: msg.body ?? "",
-      time: formatTime(new Date(msg.createdAt)),
-      isMe: msg.senderId === userId,
-      avatar: initials(msg.sender.firstname, msg.sender.lastname, msg.sender.email),
-      avatarColor: pickColor(msg.senderId),
-    }));
+    mappedMessages = messages.map((msg) => {
+      const reactionCounts = Object.values(
+        (msg.reactions ?? []).reduce<Record<string, { emoji: string; count: number }>>((acc, r) => {
+          acc[r.emoji] = acc[r.emoji] ? { emoji: r.emoji, count: acc[r.emoji].count + 1 } : { emoji: r.emoji, count: 1 };
+          return acc;
+        }, {})
+      );
+
+      return {
+        id: msg.id,
+        sender:
+          msg.sender.firstname || msg.sender.lastname
+            ? `${msg.sender.firstname} ${msg.sender.lastname}`.trim()
+            : msg.sender.email,
+        message: msg.body ?? "",
+        time: formatTime(new Date(msg.createdAt)),
+        isMe: msg.senderId === userId,
+        avatar: initials(msg.sender.firstname, msg.sender.lastname, msg.sender.email),
+        avatarColor: pickColor(msg.senderId),
+        reactions: reactionCounts,
+      };
+    });
   }
 
   return NextResponse.json({
@@ -259,4 +270,71 @@ export async function POST(req: Request) {
     conversation: mappedConversation,
     message: mappedMessage,
   });
+}
+
+export async function PUT(req: Request) {
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const userId = session.user.id;
+  const body = await req.json();
+  const { messageId, emoji } = body as { messageId?: string; emoji?: string };
+
+  if (!messageId || !emoji) {
+    return NextResponse.json({ error: "messageId and emoji are required" }, { status: 400 });
+  }
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId },
+    select: { conversationId: true },
+  });
+  if (!message) {
+    return NextResponse.json({ error: "Message not found" }, { status: 404 });
+  }
+
+  const participant = await prisma.conversationParticipant.findFirst({
+    where: { conversationId: message.conversationId, userId },
+    select: { id: true },
+  });
+  if (!participant) {
+    return NextResponse.json({ error: "Not authorized for this conversation" }, { status: 403 });
+  }
+
+  const existing = await prisma.messageReaction.findUnique({
+    where: {
+      messageId_userId_emoji: {
+        messageId,
+        userId,
+        emoji,
+      },
+    },
+  });
+
+  if (existing) {
+    await prisma.messageReaction.delete({
+      where: { id: existing.id },
+    });
+  } else {
+    await prisma.messageReaction.create({
+      data: {
+        messageId,
+        userId,
+        emoji,
+      },
+    });
+  }
+
+  const reactions = await prisma.messageReaction.findMany({
+    where: { messageId },
+    select: { emoji: true },
+  });
+
+  const aggregated = Object.values(
+    reactions.reduce<Record<string, { emoji: string; count: number }>>((acc, r) => {
+      acc[r.emoji] = acc[r.emoji] ? { emoji: r.emoji, count: acc[r.emoji].count + 1 } : { emoji: r.emoji, count: 1 };
+      return acc;
+    }, {})
+  );
+
+  return NextResponse.json({ reactions: aggregated });
 }

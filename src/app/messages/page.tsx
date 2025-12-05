@@ -338,9 +338,7 @@ function MessagesContent() {
                                     msg.isMe ? "right-0" : "left-0"
                                   }`}
                                   onClick={() =>
-                                    setShowEmojiPicker(
-                                      showEmojiPicker === msg.id ? null : msg.id
-                                    )
+                                    setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)
                                   }
                                 >
                                   <Smile className="h-3 w-3" />
@@ -355,7 +353,33 @@ function MessagesContent() {
                                     {commonEmojis.map((emoji) => (
                                       <button
                                         key={emoji}
-                                        onClick={() => handleReaction(msg.id, emoji)}
+                                        onClick={async () => {
+                                          await fetch("/api/messages", {
+                                            method: "PUT",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ messageId: msg.id, emoji }),
+                                          }).catch(() => {});
+
+                                          setMessages((prev) =>
+                                            prev.map((m) => {
+                                              if (m.id !== msg.id) return m;
+                                              const reactions = m.reactions ?? [];
+                                              const existing = reactions.find((r) => r.emoji === emoji);
+                                              if (existing) {
+                                                const updated = reactions
+                                                  .map((r) =>
+                                                    r.emoji === emoji
+                                                      ? { ...r, count: r.count === 1 ? 0 : r.count + 1 }
+                                                      : r
+                                                  )
+                                                  .filter((r) => r.count > 0);
+                                                return { ...m, reactions: updated };
+                                              }
+                                              return { ...m, reactions: [...reactions, { emoji, count: 1 }] };
+                                            })
+                                          );
+                                          setShowEmojiPicker(null);
+                                        }}
                                         className="hover:bg-muted rounded p-1 text-lg transition-colors"
                                       >
                                         {emoji}
@@ -371,7 +395,27 @@ function MessagesContent() {
                                     <div
                                       key={idx}
                                       className="bg-background border rounded-full px-2 py-0.5 text-xs flex items-center gap-1 cursor-pointer hover:bg-muted transition-colors"
-                                      onClick={() => handleReaction(msg.id, reaction.emoji)}
+                                      onClick={async () => {
+                                        await fetch("/api/messages", {
+                                          method: "PUT",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ messageId: msg.id, emoji: reaction.emoji }),
+                                        }).catch(() => {});
+                                        setMessages((prev) =>
+                                          prev.map((m) => {
+                                            if (m.id !== msg.id) return m;
+                                            const reactions = m.reactions ?? [];
+                                            const updated = reactions
+                                              .map((r) =>
+                                                r.emoji === reaction.emoji
+                                                  ? { ...r, count: Math.max(0, r.count - 1) }
+                                                  : r
+                                              )
+                                              .filter((r) => r.count > 0);
+                                            return { ...m, reactions: updated };
+                                          })
+                                        );
+                                      }}
                                     >
                                       <span>{reaction.emoji}</span>
                                       <span className="text-muted-foreground">{reaction.count}</span>
