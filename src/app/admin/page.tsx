@@ -18,30 +18,27 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
-import { useEffect } from "react";
-import { ChartPie, Users, Activity, ExternalLink, Database, Server } from "lucide-react"
-
-// Grafana dashboard URLs based on environment
-const getGrafanaUrl = () => {
-  const isProduction = typeof window !== 'undefined' &&
-    (window.location.hostname === 'bloomhealth.us' || window.location.hostname === 'www.bloomhealth.us');
-
-  return isProduction
-    ? 'https://opscvisuals.grafana.net/d/bloom-production/bloom-production'
-    : 'https://opscvisuals.grafana.net/d/bloom-qa/bloom-qa';
-};
-
-const getEnvironment = () => {
-  if (typeof window === 'undefined') return 'Development';
-  const hostname = window.location.hostname;
-  if (hostname === 'bloomhealth.us' || hostname === 'www.bloomhealth.us') return 'Production';
-  if (hostname === 'qa.bloomhealth.us') return 'QA';
-  return 'Development';
-};
+import { useEffect, useState } from "react";
+import { ChartPie, ExternalLink, Database, Server } from "lucide-react"
 
 export default function AdminPage() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
+  const [grafanaUrl, setGrafanaUrl] = useState('');
+  const [environment, setEnvironment] = useState('');
+
+  useEffect(() => {
+    // Compute environment-specific values on client
+    const hostname = window.location.hostname;
+    const isProduction = hostname === 'bloomhealth.us' || hostname === 'www.bloomhealth.us';
+    const isQA = hostname === 'qa.bloomhealth.us';
+
+    setGrafanaUrl(isProduction
+      ? 'https://opscvisuals.grafana.net/d/bloom-production/bloom-production'
+      : 'https://opscvisuals.grafana.net/d/bloom-qa/bloom-qa');
+
+    setEnvironment(isProduction ? 'Production' : isQA ? 'QA' : 'Development');
+  }, []);
 
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -101,9 +98,6 @@ export default function AdminPage() {
       </SidebarProvider>
     );
   }
-
-  const grafanaUrl = getGrafanaUrl();
-  const environment = getEnvironment();
 
   return (
     <SidebarProvider>
