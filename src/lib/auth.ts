@@ -3,7 +3,6 @@ import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from '@/lib/prisma'
 import { twoFactor } from 'better-auth/plugins'
 import { createTransport } from 'nodemailer'
-import { hashPassword, verifyPassword } from './password'
 
 // Async email sender that loads env vars at call time
 async function sendEmail(options: {
@@ -64,9 +63,6 @@ export const auth = betterAuth({
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
-    disableSignUp: false,
-    minPasswordLength: 8,
-    maxPasswordLength: 128,
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({
         to: user.email,
@@ -91,14 +87,6 @@ export const auth = betterAuth({
         `,
       })
     },
-    password: {
-      hash: async (password) => {
-        return hashPassword(password)
-      },
-      verify: async ({ hash, password }) => {
-        return verifyPassword(hash, password)
-      },
-    },
   },
   user: {
     additionalFields: {
@@ -115,10 +103,6 @@ export const auth = betterAuth({
         type: 'string',
         input: false,
         default: 'UNSET',
-      },
-      bio: {
-        type: 'string',
-        input: true,
       },
     },
   },
