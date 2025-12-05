@@ -13,79 +13,63 @@ export async function GET() {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const userId = session.user.id;
     const userRole = (session.user as { role?: string }).role;
 
-    // Dummy data for testing - will be replaced with actual database relationships
     const people: Array<{
       id: string;
       name: string;
       email: string;
       image?: string | null;
       role?: string;
-    }> = userRole === "THERAPIST" ? [
-      {
-        id: "1",
-        name: "Sarah Johnson",
-        email: "sarah.j@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "2",
-        name: "Michael Chen",
-        email: "m.chen@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "3",
-        name: "Emily Rodriguez",
-        email: "emily.r@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "4",
-        name: "David Kim",
-        email: "david.kim@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "5",
-        name: "Jessica Martinez",
-        email: "j.martinez@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "6",
-        name: "Robert Taylor",
-        email: "robert.t@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "7",
-        name: "Amanda Wilson",
-        email: "amanda.w@example.com",
-        image: null,
-        role: "PATIENT"
-      }
-    ] : [
-      {
-        id: "therapist-1",
-        name: "Dr. Jennifer Smith",
-        email: "dr.smith@bloom.com",
-        image: null,
-        role: "THERAPIST"
-      }
-    ];
+    }> = [];
 
-    // TODO: Implement actual patient-therapist relationship lookup
-    // If THERAPIST role: fetch all patients assigned to this therapist
-    // If PATIENT role: fetch the assigned therapist
+    if (userRole === "THERAPIST") {
+      const patients = await prisma.user.findMany({
+        where: { role: "PATIENT" },
+        select: {
+          id: true,
+          firstname: true,
+          lastname: true,
+          email: true,
+          image: true,
+          role: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 200,
+      });
+      patients.forEach((p) => {
+        people.push({
+          id: p.id,
+          name: p.firstname || p.lastname ? `${p.firstname} ${p.lastname}`.trim() : p.email,
+          email: p.email,
+          image: p.image,
+          role: p.role,
+        });
+      });
+    } else if (userRole === "PATIENT") {
+      const therapists = await prisma.user.findMany({
+        where: { role: "THERAPIST" },
+        select: {
+          id: true,
+          firstname: true,
+          lastname: true,
+          email: true,
+          image: true,
+          role: true,
+        },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+      });
+      therapists.forEach((t) => {
+        people.push({
+          id: t.id,
+          name: t.firstname || t.lastname ? `${t.firstname} ${t.lastname}`.trim() : t.email,
+          email: t.email,
+          image: t.image,
+          role: t.role,
+        });
+      });
+    }
 
     return NextResponse.json({ people });
   } catch (error) {
