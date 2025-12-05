@@ -21,6 +21,8 @@ import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock } from "luci
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { useEffect, useState, useMemo } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 type Appointment = {
   id: string;
@@ -38,6 +40,14 @@ export default function CalendarPage() {
   const { data: session, isPending } = useSession();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [weekOffset, setWeekOffset] = useState(0);
+  const [connections, setConnections] = useState<Array<{ id: string; name: string }>>([]);
+  const [showCreate, setShowCreate] = useState(false);
+  const [selectedParticipant, setSelectedParticipant] = useState<string>("");
+  const [date, setDate] = useState<string>("");
+  const [startTime, setStartTime] = useState<string>("10:00");
+  const [duration, setDuration] = useState<number>(30);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const today = useMemo(() => new Date(), []);
   const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -94,6 +104,31 @@ export default function CalendarPage() {
     };
   }, [isPending, session]);
 
+  useEffect(() => {
+    if (isPending || !session?.user) return;
+    let cancelled = false;
+    const loadConnections = async () => {
+      try {
+        const res = await fetch("/api/user/connections");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setConnections(
+          (data.people ?? []).map((p: any) => ({
+            id: p.id,
+            name: p.name ?? p.email ?? "Unknown",
+          }))
+        );
+      } catch {
+        // ignore
+      }
+    };
+    loadConnections();
+    return () => {
+      cancelled = true;
+    };
+  }, [isPending, session]);
+
   const appointmentsThisWeek = useMemo(() => {
     return appointments
       .filter((apt) => {
@@ -109,6 +144,58 @@ export default function CalendarPage() {
     return <p className="text-center mt-8 text-white">Redirecting...</p>;
 
   const { user } = session;
+  const isTherapist = (user as { role?: string }).role === "THERAPIST";
+
+  const handleCreateAppointment = async () => {
+    if (!selectedParticipant || !date || !startTime || duration <= 0) {
+      setError("Please fill all fields");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const [hours, minutes] = startTime.split(":").map((v) => parseInt(v, 10));
+      const start = new Date(date);
+      start.setHours(hours, minutes, 0, 0);
+      const end = new Date(start.getTime() + duration * 60000);
+
+      const res = await fetch("/api/appointments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          startAt: start.toISOString(),
+          endAt: end.toISOString(),
+          participantId: selectedParticipant,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to create appointment");
+      }
+
+      // refresh appointments
+      const refresh = await fetch("/api/appointments");
+      if (refresh.ok) {
+        const data = (await refresh.json()) as { appointments?: Appointment[] };
+        setAppointments(
+          (data.appointments ?? []).map((apt) => ({
+            ...apt,
+            start: new Date(apt.start),
+            end: new Date(apt.end),
+          }))
+        );
+      }
+      setShowCreate(false);
+      setSelectedParticipant("");
+      setDate("");
+      setStartTime("10:00");
+      setDuration(30);
+    } catch (err: any) {
+      setError(err.message || "Unable to create appointment");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -132,11 +219,11 @@ export default function CalendarPage() {
 
         <div className="flex flex-col h-[calc(100vh-4rem)] overflow-hidden">
           <div className="p-4 border-b bg-background flex-shrink-0">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <CalendarIcon className="h-6 w-6 text-primary" />
-                  <div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center gap-2">
+                    <CalendarIcon className="h-6 w-6 text-primary" />
+                    <div>
                     <h2 className="text-2xl font-bold">Calendar</h2>
                     <p className="text-sm text-muted-foreground">{currentMonth}</p>
                   </div>
@@ -164,6 +251,11 @@ export default function CalendarPage() {
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>
+                {connections.length > 0 && (
+                  <Button size="sm" onClick={() => setShowCreate(true)}>
+                    New Appointment
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -248,6 +340,71 @@ export default function CalendarPage() {
               })}
             </div>
           </div>
+          {showCreate && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+              <div className="bg-background w-full max-w-lg rounded-lg shadow-xl p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Create appointment</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {isTherapist ? "Select a patient and time" : "Select your therapist and time"}
+                    </p>
+                  </div>
+                  <Button variant="ghost" onClick={() => setShowCreate(false)}>
+                    Close
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <Label>Participant</Label>
+                    <select
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                      value={selectedParticipant}
+                      onChange={(e) => setSelectedParticipant(e.target.value)}
+                    >
+                      <option value="">{isTherapist ? "Choose patient" : "Choose therapist"}</option>
+                      {connections.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Date</Label>
+                      <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Start time</Label>
+                      <Input type="time" value={startTime} onChange={(e) => setStartTime(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Duration (minutes)</Label>
+                    <Input
+                      type="number"
+                      min={15}
+                      step={15}
+                      value={duration}
+                      onChange={(e) => setDuration(Number(e.target.value) || 0)}
+                    />
+                  </div>
+                  {error && <p className="text-sm text-destructive">{error}</p>}
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                  <Button variant="ghost" onClick={() => setShowCreate(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={handleCreateAppointment} disabled={saving}>
+                    {saving ? "Saving..." : "Create"}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </SidebarInset>
     </SidebarProvider>

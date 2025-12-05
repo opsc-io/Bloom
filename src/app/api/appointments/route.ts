@@ -57,3 +57,53 @@ export async function GET(req: Request) {
 
   return NextResponse.json({ appointments: formatted });
 }
+
+export async function POST(req: Request) {
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const { startAt, endAt, participantId } = body as {
+    startAt?: string;
+    endAt?: string;
+    participantId?: string;
+  };
+
+  if (!startAt || !endAt || !participantId) {
+    return NextResponse.json({ error: "startAt, endAt and participantId are required" }, { status: 400 });
+  }
+
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return NextResponse.json({ error: "Invalid date format" }, { status: 400 });
+  }
+  if (end <= start) {
+    return NextResponse.json({ error: "endAt must be after startAt" }, { status: 400 });
+  }
+
+  const isTherapist = session.user.role === "THERAPIST";
+  const therapistId = isTherapist ? session.user.id : participantId;
+  const patientId = isTherapist ? participantId : session.user.id;
+
+  // Ensure participant exists
+  const otherUser = await prisma.user.findUnique({
+    where: { id: participantId },
+    select: { id: true },
+  });
+  if (!otherUser) {
+    return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+  }
+
+  const appt = await prisma.appointment.create({
+    data: {
+      therapistId,
+      patientId,
+      startAt: start,
+      endAt: end,
+      status: "SCHEDULED",
+    },
+  });
+
+  return NextResponse.json({ appointmentId: appt.id });
+}
