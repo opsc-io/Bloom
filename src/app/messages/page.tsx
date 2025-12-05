@@ -18,11 +18,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Send, MessageSquarePlus } from "lucide-react";
+import { Search, Send } from "lucide-react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 
 type Conversation = {
   id: string;
@@ -46,6 +46,14 @@ type Message = {
 };
 
 export default function MessagesPage() {
+  return (
+    <Suspense fallback={<p className="text-center mt-8 text-white">Loading...</p>}>
+      <MessagesPageContent />
+    </Suspense>
+  );
+}
+
+function MessagesPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const messageUserId = searchParams.get("message");
