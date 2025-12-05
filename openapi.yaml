@@ -1,0 +1,476 @@
+openapi: 3.0.3
+info:
+  title: Bloom Health API
+  version: 1.0.0
+  description: REST API for Bloom Health therapy practice platform
+  contact:
+    name: Bloom Health
+    url: https://bloomhealth.us
+
+servers:
+  - url: http://localhost:3000/api
+    description: Local development
+  - url: https://bloomhealth.us/api
+    description: Production
+  - url: https://qa.bloomhealth.us/api
+    description: QA/Staging
+
+tags:
+  - name: Authentication
+    description: User authentication via Better Auth
+  - name: Appointments
+    description: Appointment management
+  - name: User
+    description: User profile and settings
+  - name: Messages
+    description: Messaging and conversations
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: better-auth.session_token
+      description: Session cookie set by Better Auth
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "clx1234567890"
+        email:
+          type: string
+          format: email
+        firstname:
+          type: string
+        lastname:
+          type: string
+        role:
+          type: string
+          enum: [UNSET, PATIENT, THERAPIST, ADMIN]
+        image:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    Appointment:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+          example: "Appointment"
+        start:
+          type: string
+          format: date-time
+        end:
+          type: string
+          format: date-time
+        durationMinutes:
+          type: integer
+          example: 60
+        client:
+          type: string
+          description: Patient name (for therapists) or therapist name (for patients)
+        color:
+          type: string
+          example: "bg-blue-500"
+        zoomLink:
+          type: string
+          nullable: true
+
+    Connection:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        image:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [PATIENT, THERAPIST]
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    Success:
+      type: object
+      properties:
+        success:
+          type: boolean
+
+security:
+  - cookieAuth: []
+
+paths:
+  /auth/{path}:
+    get:
+      tags: [Authentication]
+      summary: Better Auth endpoints (catch-all)
+      description: Handles session management, OAuth callbacks, email verification
+      security: []
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Auth endpoint path (e.g., session, callback/google)
+      responses:
+        '200':
+          description: Success
+    post:
+      tags: [Authentication]
+      summary: Better Auth endpoints (catch-all)
+      description: |
+        Handles authentication operations:
+        - `sign-up/email` - Register with email/password
+        - `sign-in/email` - Login with email/password
+        - `sign-in/social` - OAuth login (Google, Zoom)
+        - `sign-out` - Logout
+        - `forget-password` - Request password reset
+        - `reset-password` - Reset password with token
+        - `verify-email` - Verify email address
+        - `two-factor/*` - 2FA operations
+      security: []
+      parameters:
+        - name: path
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              description: Request body varies by endpoint
+      responses:
+        '200':
+          description: Success
+
+  /appointments:
+    get:
+      tags: [Appointments]
+      summary: Get weekly appointments
+      description: |
+        Returns appointments for the current week (Monday to Sunday).
+        - Therapists see appointments where they are the therapist
+        - Patients see appointments where they are the patient
+      responses:
+        '200':
+          description: List of appointments
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  appointments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Appointment'
+              example:
+                appointments:
+                  - id: "abc123"
+                    title: "Appointment"
+                    start: "2024-01-15T10:00:00Z"
+                    end: "2024-01-15T11:00:00Z"
+                    durationMinutes: 60
+                    client: "John Doe"
+                    color: "bg-blue-500"
+                    zoomLink: "https://zoom.us/j/123456789"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /messages:
+    get:
+      tags: [Messages]
+      summary: Get conversations and messages
+      description: Fetches conversations and messages for the current user
+      responses:
+        '200':
+          description: Conversations list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversations:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        avatar:
+                          type: string
+                          nullable: true
+                        lastMessage:
+                          type: string
+                        unreadCount:
+                          type: integer
+                        active:
+                          type: boolean
+                  messages:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        content:
+                          type: string
+                        senderId:
+                          type: string
+                        timestamp:
+                          type: string
+                          format: date-time
+        '401':
+          description: Unauthorized
+
+  /user/{userId}:
+    get:
+      tags: [User]
+      summary: Get user by ID
+      description: Retrieves a user's profile information by their ID
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The user's unique identifier
+      responses:
+        '200':
+          description: User profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/connections:
+    get:
+      tags: [User]
+      summary: Get connected users
+      description: |
+        Returns users connected to the current user based on their role:
+        - For therapists: Returns their patients
+        - For patients: Returns their therapist(s)
+      responses:
+        '200':
+          description: List of connections
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  people:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Connection'
+              example:
+                people:
+                  - id: "user123"
+                    name: "Sarah Johnson"
+                    email: "sarah.j@example.com"
+                    image: null
+                    role: "PATIENT"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/profile:
+    patch:
+      tags: [User]
+      summary: Update user profile
+      description: Updates the current user's profile information
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                firstname:
+                  type: string
+                  description: User's first name
+                lastname:
+                  type: string
+                  description: User's last name
+                bio:
+                  type: string
+                  description: User's bio/description
+            example:
+              firstname: "John"
+              lastname: "Doe"
+              bio: "Licensed therapist with 10 years of experience"
+      responses:
+        '200':
+          description: Profile updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    type: object
+                    properties:
+                      firstname:
+                        type: string
+                      lastname:
+                        type: string
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/password:
+    post:
+      tags: [User]
+      summary: Change password
+      description: Changes the current user's password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - currentPassword
+                - newPassword
+              properties:
+                currentPassword:
+                  type: string
+                  minLength: 1
+                  description: The user's current password
+                newPassword:
+                  type: string
+                  minLength: 8
+                  description: The new password (minimum 8 characters)
+            example:
+              currentPassword: "oldPassword123"
+              newPassword: "newSecurePassword456"
+      responses:
+        '200':
+          description: Password changed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Success'
+        '400':
+          description: Validation error or incorrect current password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              examples:
+                missing_fields:
+                  value:
+                    error: "Both current and new password are required"
+                password_too_short:
+                  value:
+                    error: "New password must be at least 8 characters"
+                wrong_password:
+                  value:
+                    error: "Failed to change password. Current password may be incorrect."
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /user/role:
+    post:
+      tags: [User]
+      summary: Set user role
+      description: Sets the user's role to either practitioner (therapist) or patient
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - role
+              properties:
+                role:
+                  type: string
+                  enum: [practitioner, patient]
+                  description: The role to assign to the user
+            example:
+              role: "practitioner"
+      responses:
+        '200':
+          description: Role updated successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  role:
+                    type: string
+              example:
+                success: true
+                role: "practitioner"
+        '400':
+          description: Invalid role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+              example:
+                error: "Invalid role. Must be 'practitioner' or 'patient'"
+        '401':
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
