@@ -107,3 +107,73 @@ export async function POST(req: Request) {
 
   return NextResponse.json({ appointmentId: appt.id });
 }
+
+export async function PATCH(req: Request) {
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const { appointmentId, startAt, endAt } = body as { appointmentId?: string; startAt?: string; endAt?: string };
+  if (!appointmentId || !startAt || !endAt) {
+    return NextResponse.json({ error: "appointmentId, startAt and endAt are required" }, { status: 400 });
+  }
+
+  const appt = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: { id: true, therapistId: true },
+  });
+  if (!appt) {
+    return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+  }
+
+  if (appt.therapistId !== session.user.id) {
+    return NextResponse.json({ error: "Only the therapist can edit this appointment" }, { status: 403 });
+  }
+
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
+    return NextResponse.json({ error: "Invalid start/end times" }, { status: 400 });
+  }
+
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: {
+      startAt: start,
+      endAt: end,
+      status: "SCHEDULED",
+    },
+  });
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(req: Request) {
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const { appointmentId } = body as { appointmentId?: string };
+  if (!appointmentId) {
+    return NextResponse.json({ error: "appointmentId is required" }, { status: 400 });
+  }
+
+  const appt = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: { id: true, patientId: true },
+  });
+  if (!appt) {
+    return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+  }
+
+  if (appt.patientId !== session.user.id) {
+    return NextResponse.json({ error: "Only the patient can cancel this appointment" }, { status: 403 });
+  }
+
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { status: "CANCELLED" },
+  });
+
+  return NextResponse.json({ success: true });
+}

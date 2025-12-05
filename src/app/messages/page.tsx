@@ -120,6 +120,7 @@ function MessagesContent() {
           if (messageUserId && convIds.includes(messageUserId)) {
             setActiveConversation(messageUserId);
           } else if (messageUserId) {
+            // allow starting a new conversation with a user id from the query param
             setActiveConversation(messageUserId);
           } else if (data.conversations?.length > 0) {
             setActiveConversation(data.conversations[0].id);
@@ -188,15 +189,19 @@ function MessagesContent() {
     };
   }, [isPending, session]);
 
-  const handleSendMessage = async () => {
-    if (!newMessage.trim() || !activeConversation) return;
+  const handleSendMessage = async (overrideRecipientId?: string) => {
+    if (!newMessage.trim() && !overrideRecipientId) return;
+    const target = overrideRecipientId ?? activeConversation;
+    if (!target) return;
 
-    const payload: Record<string, string> = { message: newMessage.trim() };
-    const conversationExists = conversations.some((c) => c.id === activeConversation);
+    const payload: Record<string, string> = {
+      message: newMessage.trim(),
+    };
+    const conversationExists = conversations.some((c) => c.id === target);
     if (conversationExists) {
-      payload.conversationId = activeConversation;
+      payload.conversationId = target;
     } else {
-      payload.recipientId = activeConversation;
+      payload.recipientId = target;
     }
 
     try {
@@ -219,7 +224,9 @@ function MessagesContent() {
       if (data.message) {
         setMessages((prev) => [...prev, data.message!]);
       }
-      setNewMessage("");
+      if (!overrideRecipientId) {
+        setNewMessage("");
+      }
       setShowEmojiPicker(null);
     } catch {
       // ignore errors for now
