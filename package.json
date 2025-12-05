@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "npx prisma generate",
-    "seed": "prisma db seed"
+    "seed": "prisma db seed",
+    "socket": "tsx scripts/socket-server.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -32,16 +33,20 @@
     "better-auth": "1.4",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "ioredis": "^5.8.2",
     "lucide-react": "^0.553.0",
     "next": "^16.0.7",
     "nodemailer": "^7.0.11",
     "react": "19.2.0",
     "react-dom": "19.2.0",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
     "@faker-js/faker": "^10.1.0",
     "@tailwindcss/postcss": "^4",
+    "@types/bcrypt": "^6.0.0",
     "@types/node": "^20.19.24",
     "@types/nodemailer": "^7.0.4",
     "@types/react": "^19",

@@ -23,6 +23,7 @@ import { Search, Send, MessageSquarePlus, Smile } from "lucide-react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
+import { io, Socket } from "socket.io-client";
 
 export const dynamic = "force-dynamic";
 
@@ -60,7 +61,9 @@ function MessagesContent() {
   const [newMessage, setNewMessage] = useState("");
   const [conversationSearch, setConversationSearch] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
-  const [isTyping, setIsTyping] = useState(false);
+  const [typingMap, setTypingMap] = useState<Record<string, { userId: string; name?: string | null; expiresAt: number }>>({});
+  const socketRef = React.useRef<Socket | null>(null);
+  const lastTypingSentRef = React.useRef<number>(0);
 
   const commonEmojis = ["👍", "❤️", "😊", "😂", "🎉", "👏"];
 
@@ -133,6 +136,46 @@ function MessagesContent() {
     };
   }, [isPending, session, messageUserId, activeConversation]);
 
+  useEffect(() => {
+    if (isPending || !session?.user) return;
+    const url = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000";
+    const socket = io(url, {
+      withCredentials: true,
+      auth: {
+        token: typeof document !== "undefined" ? document.cookie : undefined,
+      },
+    });
+    socketRef.current = socket;
+
+    socket.on("typing", (payload: { conversationId: string; userId: string; name?: string | null; expiresAt: number }) => {
+      setTypingMap((prev) => ({
+        ...prev,
+        [payload.conversationId]: payload,
+      }));
+    });
+
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setTypingMap((prev) => {
+        const next = { ...prev };
+        let changed = false;
+        for (const key of Object.keys(next)) {
+          if (next[key].expiresAt < now) {
+            delete next[key];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }, 1000);
+
+    return () => {
+      clearInterval(interval);
+      socket.disconnect();
+      socketRef.current = null;
+    };
+  }, [isPending, session]);
+
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !activeConversation) return;
 
@@ -166,7 +209,6 @@ function MessagesContent() {
       }
       setNewMessage("");
       setShowEmojiPicker(null);
-      setIsTyping(false);
     } catch {
       // ignore errors for now
     }
@@ -177,6 +219,11 @@ function MessagesContent() {
   );
 
   const activeConv = conversations.find((c) => c.id === activeConversation);
+  const typingEntry = activeConversation ? typingMap[activeConversation] : undefined;
+  const isTyping =
+    typingEntry &&
+    typingEntry.userId !== (session?.user as { id?: string })?.id &&
+    typingEntry.expiresAt > Date.now();
 
   if (isPending) return <p className="text-center mt-8 text-white">Loading...</p>;
   if (!session?.user) return <p className="text-center mt-8 text-white">Redirecting...</p>;
@@ -286,7 +333,9 @@ function MessagesContent() {
                         <p className="text-xs text-muted-foreground">
                           {isTyping ? (
                             <span className="flex items-center gap-1">
-                              <span className="animate-pulse">typing</span>
+                              <span className="animate-pulse">
+                                {typingEntry?.name ? `${typingEntry.name} is typing` : "Typing"}
+                              </span>
                               <span className="flex gap-0.5">
                                 <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
                                 <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
@@ -479,17 +528,16 @@ function MessagesContent() {
                         value={newMessage}
                         onChange={(e) => {
                           setNewMessage(e.target.value);
-                          if (e.target.value.trim()) {
-                            setIsTyping(true);
-                          } else {
-                            setIsTyping(false);
+                          const now = Date.now();
+                          if (now - lastTypingSentRef.current > 1000 && socketRef.current && activeConversation) {
+                            socketRef.current.emit("typing", { conversationId: activeConversation });
+                            lastTypingSentRef.current = now;
                           }
                         }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && !e.shiftKey) {
                             e.preventDefault();
                             handleSendMessage();
-                            setIsTyping(false);
                           }
                         }}
                         className="flex-1"
@@ -497,7 +545,6 @@ function MessagesContent() {
                       <Button
                         onClick={() => {
                           handleSendMessage();
-                          setIsTyping(false);
                         }}
                         size="icon"
                       >
