@@ -69,18 +69,28 @@ export default function MessagesPage() {
 
     const loadMessages = async () => {
       try {
-        const res = await fetch("/api/messages");
+        const res = await fetch(
+          activeConversation ? `/api/messages?conversationId=${activeConversation}` : "/api/messages"
+        );
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
         setConversations(data.conversations ?? []);
         setMessages(data.messages ?? []);
-        
-        // Set active conversation from query param or first conversation
-        if (messageUserId) {
-          setActiveConversation(messageUserId);
-        } else if (data.conversations?.length > 0) {
-          setActiveConversation(data.conversations[0].id);
+
+        // Determine active conversation: query param, existing active, or first available
+        const convIds = (data.conversations ?? []).map((c: Conversation) => c.id);
+        if (activeConversation && !convIds.includes(activeConversation)) {
+          setActiveConversation(data.conversations?.[0]?.id ?? null);
+        } else if (!activeConversation) {
+          if (messageUserId && convIds.includes(messageUserId)) {
+            setActiveConversation(messageUserId);
+          } else if (messageUserId) {
+            // allow starting a new conversation with a user id from the query param
+            setActiveConversation(messageUserId);
+          } else if (data.conversations?.length > 0) {
+            setActiveConversation(data.conversations[0].id);
+          }
         }
       } catch {
         // Handle error silently
@@ -91,28 +101,45 @@ export default function MessagesPage() {
     return () => {
       cancelled = true;
     };
-  }, [isPending, session, messageUserId]);
+  }, [isPending, session, messageUserId, activeConversation]);
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!newMessage.trim() || !activeConversation) return;
-    
-    // TODO: Implement actual message sending
-    const newMsg: Message = {
-      id: Date.now().toString(),
-      sender: "You",
-      message: newMessage,
-      time: new Date().toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-        hour12: true,
-      }),
-      isMe: true,
-      avatar: "Y",
-      avatarColor: "bg-blue-500",
-    };
-    
-    setMessages([...messages, newMsg]);
-    setNewMessage("");
+
+    const payload: Record<string, string> = { message: newMessage.trim() };
+    const conversationExists = conversations.some((c) => c.id === activeConversation);
+    if (conversationExists) {
+      payload.conversationId = activeConversation;
+    } else {
+      payload.recipientId = activeConversation;
+    }
+
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        return;
+      }
+
+      const data = await res.json() as { conversation?: Conversation; message?: Message };
+      if (data.conversation) {
+        setConversations((prev) => {
+          const filtered = prev.filter((c) => c.id !== data.conversation!.id).map((c) => ({ ...c, active: false }));
+          return [{ ...data.conversation!, active: true }, ...filtered];
+        });
+        setActiveConversation(data.conversation.id);
+      }
+      if (data.message) {
+        setMessages((prev) => [...prev, data.message!]);
+      }
+      setNewMessage("");
+    } catch {
+      // ignore errors for now
+    }
   };
 
   const filteredConversations = conversations.filter((conv) =>

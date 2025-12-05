@@ -21,6 +21,11 @@ export async function GET() {
         email: true,
         bio: true,
         image: true,
+        accounts: {
+          select: {
+            providerId: true,
+          },
+        },
       },
     });
 
@@ -28,7 +33,21 @@ export async function GET() {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ user });
+    const allowPasswordChange = user.accounts.some(
+      (acct) => acct.providerId === "email" || acct.providerId === "credentials"
+    );
+
+    return NextResponse.json({
+      user: {
+        firstname: user.firstname,
+        lastname: user.lastname,
+        email: user.email,
+        bio: user.bio,
+        image: user.image,
+      },
+      accounts: user.accounts,
+      allowPasswordChange,
+    });
   } catch (error) {
     console.error("Error fetching profile:", error);
     return NextResponse.json(
@@ -49,12 +68,13 @@ export async function PATCH(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { firstname, lastname, bio } = body;
+    const { firstname, lastname, bio, image } = body;
 
     if (
       firstname === undefined &&
       lastname === undefined &&
-      bio === undefined
+      bio === undefined &&
+      image === undefined
     ) {
       return NextResponse.json(
         { error: "No fields provided to update" },
@@ -69,6 +89,7 @@ export async function PATCH(req: NextRequest) {
         ...(firstname !== undefined && { firstname }),
         ...(lastname !== undefined && { lastname }),
         ...(bio !== undefined && { bio }),
+        ...(image !== undefined && { image }),
       },
     });
 
@@ -78,6 +99,7 @@ export async function PATCH(req: NextRequest) {
         firstname: updatedUser.firstname,
         lastname: updatedUser.lastname,
         bio: updatedUser.bio,
+        image: updatedUser.image,
       }
     });
   } catch (error) {

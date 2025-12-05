@@ -37,6 +37,34 @@ async function seedUsers() {
   return { therapist, patients };
 }
 
+async function seedAppointments({ therapist, patients }: Awaited<ReturnType<typeof seedUsers>>) {
+  await prisma.appointmentNote.deleteMany();
+  await prisma.appointment.deleteMany();
+
+  const now = new Date();
+
+  const appointments = await Promise.all(
+    patients.map((patient, idx) => {
+      const startAt = new Date(now);
+      startAt.setDate(startAt.getDate() + idx);
+      startAt.setHours(10, 0, 0, 0);
+      const endAt = new Date(startAt.getTime() + 60 * 60 * 1000);
+
+      return prisma.appointment.create({
+        data: {
+          therapistId: therapist.id,
+          patientId: patient.id,
+          startAt,
+          endAt,
+          status: "SCHEDULED",
+        },
+      });
+    })
+  );
+
+  return appointments;
+}
+
 async function seedConversations({ therapist, patients }: Awaited<ReturnType<typeof seedUsers>>) {
   await prisma.$transaction([
     prisma.messageReaction.deleteMany(),
@@ -79,6 +107,7 @@ async function seedConversations({ therapist, patients }: Awaited<ReturnType<typ
 
 async function main() {
   const users = await seedUsers();
+  await seedAppointments(users);
   const conversations = await seedConversations(users);
 
   console.log("Seeded therapist:", users.therapist.email);

@@ -16,76 +16,87 @@ export async function GET() {
     const userId = session.user.id;
     const userRole = (session.user as { role?: string }).role;
 
-    // Dummy data for testing - will be replaced with actual database relationships
     const people: Array<{
       id: string;
       name: string;
       email: string;
       image?: string | null;
       role?: string;
-    }> = userRole === "THERAPIST" ? [
-      {
-        id: "1",
-        name: "Sarah Johnson",
-        email: "sarah.j@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "2",
-        name: "Michael Chen",
-        email: "m.chen@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "3",
-        name: "Emily Rodriguez",
-        email: "emily.r@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "4",
-        name: "David Kim",
-        email: "david.kim@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "5",
-        name: "Jessica Martinez",
-        email: "j.martinez@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "6",
-        name: "Robert Taylor",
-        email: "robert.t@example.com",
-        image: null,
-        role: "PATIENT"
-      },
-      {
-        id: "7",
-        name: "Amanda Wilson",
-        email: "amanda.w@example.com",
-        image: null,
-        role: "PATIENT"
-      }
-    ] : [
-      {
-        id: "therapist-1",
-        name: "Dr. Jennifer Smith",
-        email: "dr.smith@bloom.com",
-        image: null,
-        role: "THERAPIST"
-      }
-    ];
+    }> = [];
 
-    // TODO: Implement actual patient-therapist relationship lookup
-    // If THERAPIST role: fetch all patients assigned to this therapist
-    // If PATIENT role: fetch the assigned therapist
+    if (userRole === "THERAPIST") {
+      const appointments = await prisma.appointment.findMany({
+        where: { therapistId: userId },
+        select: {
+          patient: {
+            select: {
+              id: true,
+              firstname: true,
+              lastname: true,
+              email: true,
+              image: true,
+              role: true,
+            },
+          },
+        },
+        orderBy: { startAt: "desc" },
+        take: 50,
+      });
+
+      const seen = new Set<string>();
+      for (const appt of appointments) {
+        const patient = appt.patient;
+        if (patient && !seen.has(patient.id)) {
+          seen.add(patient.id);
+          people.push({
+            id: patient.id,
+            name:
+              patient.firstname || patient.lastname
+                ? `${patient.firstname} ${patient.lastname}`.trim()
+                : patient.email,
+            email: patient.email,
+            image: patient.image,
+            role: patient.role,
+          });
+        }
+      }
+    } else if (userRole === "PATIENT") {
+      const appointments = await prisma.appointment.findMany({
+        where: { patientId: userId },
+        select: {
+          therapist: {
+            select: {
+              id: true,
+              firstname: true,
+              lastname: true,
+              email: true,
+              image: true,
+              role: true,
+            },
+          },
+        },
+        orderBy: { startAt: "desc" },
+        take: 5,
+      });
+
+      const seen = new Set<string>();
+      for (const appt of appointments) {
+        const therapist = appt.therapist;
+        if (therapist && !seen.has(therapist.id)) {
+          seen.add(therapist.id);
+          people.push({
+            id: therapist.id,
+            name:
+              therapist.firstname || therapist.lastname
+                ? `${therapist.firstname} ${therapist.lastname}`.trim()
+                : therapist.email,
+            email: therapist.email,
+            image: therapist.image,
+            role: therapist.role,
+          });
+        }
+      }
+    }
 
     return NextResponse.json({ people });
   } catch (error) {

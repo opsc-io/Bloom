@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
+import { UserRole } from "@/generated/prisma/client";
 
 const colorPool = ["bg-blue-500", "bg-purple-500", "bg-green-500", "bg-amber-500", "bg-pink-500", "bg-indigo-500"];
 
@@ -10,114 +11,252 @@ const pickColor = (id: string) => {
   return colorPool[Math.abs(hash) % colorPool.length];
 };
 
-const initials = (firstname?: string | null, lastname?: string | null) => {
+const initials = (firstname?: string | null, lastname?: string | null, fallback?: string) => {
   const first = firstname?.trim()?.[0] ?? "";
   const last = lastname?.trim()?.[0] ?? "";
   const combined = `${first}${last}`.toUpperCase();
-  return combined || "U";
+  return combined || fallback?.[0]?.toUpperCase() || "U";
 };
+
+const formatTime = (date: Date) =>
+  date.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
 
 export async function GET(req: Request) {
   const session = await auth.api.getSession({ headers: req.headers });
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = session.user.id;
+  const searchParams = new URL(req.url).searchParams;
+  const requestedConversationId = searchParams.get("conversationId");
 
-  // Dummy conversation data for testing
-  const dummyConversations = [
-    {
-      id: "conv-1",
-      name: "Dr. Sarah Mitchell",
-      avatar: "SM",
-      avatarColor: "bg-blue-500",
-      lastMessage: "How have you been feeling this week?",
-      time: "2:30 PM",
-      unread: 2,
-      active: true,
+  const conversations = await prisma.conversation.findMany({
+    where: { participants: { some: { userId } } },
+    include: {
+      participants: { include: { user: true } },
+      messages: {
+        include: { sender: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
     },
-    {
-      id: "conv-2",
-      name: "Michael Chen",
-      avatar: "MC",
-      avatarColor: "bg-purple-500",
-      lastMessage: "Thanks for the session yesterday!",
-      time: "11:45 AM",
+    orderBy: [{ lastMessageAt: "desc" }, { createdAt: "desc" }],
+    take: 10,
+  });
+
+  const activeConversationId =
+    requestedConversationId && conversations.some((c) => c.id === requestedConversationId)
+      ? requestedConversationId
+      : conversations[0]?.id;
+
+  const mappedConversations = conversations.map((conv) => {
+    const lastMsg = conv.messages[0];
+    const otherParticipant = conv.participants.find((p) => p.userId !== userId)?.user ?? conv.participants[0]?.user;
+    const name =
+      otherParticipant?.firstname || otherParticipant?.lastname
+        ? `${otherParticipant?.firstname ?? ""} ${otherParticipant?.lastname ?? ""}`.trim()
+        : otherParticipant?.email ?? "Conversation";
+    const avatarInitials = initials(otherParticipant?.firstname, otherParticipant?.lastname, otherParticipant?.email);
+    return {
+      id: conv.id,
+      name,
+      avatar: avatarInitials,
+      avatarColor: pickColor(conv.id),
+      lastMessage: lastMsg?.body ?? "",
+      time: lastMsg ? formatTime(new Date(lastMsg.createdAt)) : "",
       unread: 0,
-      active: false,
-    },
-    {
-      id: "conv-3",
-      name: "Emily Rodriguez",
-      avatar: "ER",
-      avatarColor: "bg-green-500",
-      lastMessage: "Can we reschedule our appointment?",
-      time: "Yesterday",
-      unread: 1,
-      active: false,
-    },
-  ];
+      active: conv.id === activeConversationId,
+    };
+  });
 
-  const dummyMessages = [
-    {
-      id: "msg-1",
-      sender: "Dr. Sarah Mitchell",
-      message: "Hi! How have you been feeling this week?",
-      time: "2:25 PM",
-      isMe: false,
-      avatar: "SM",
-      avatarColor: "bg-blue-500",
-    },
-    {
-      id: "msg-2",
-      sender: "You",
-      message: "I've been doing better, thank you for asking.",
-      time: "2:27 PM",
-      isMe: true,
-      avatar: "Y",
-      avatarColor: "bg-blue-500",
-    },
-    {
-      id: "msg-3",
-      sender: "Dr. Sarah Mitchell",
-      message: "That's great to hear! Have you been practicing the breathing exercises we discussed?",
-      time: "2:28 PM",
-      isMe: false,
-      avatar: "SM",
-      avatarColor: "bg-blue-500",
-    },
-    {
-      id: "msg-4",
-      sender: "You",
-      message: "Yes, I've been doing them every morning and it really helps with my anxiety.",
-      time: "2:29 PM",
-      isMe: true,
-      avatar: "Y",
-      avatarColor: "bg-blue-500",
-    },
-    {
-      id: "msg-5",
-      sender: "Dr. Sarah Mitchell",
-      message: "Excellent! Keep up the good work. Let's schedule our next session.",
-      time: "2:30 PM",
-      isMe: false,
-      avatar: "SM",
-      avatarColor: "bg-blue-500",
-    },
-  ];
+  let mappedMessages: Array<{
+    id: string;
+    sender: string;
+    message: string;
+    time: string;
+    isMe: boolean;
+    avatar: string;
+    avatarColor: string;
+  }> = [];
 
-  // TODO: Replace with actual database queries
-  // const conversations = await prisma.conversation.findMany({
-  //   where: { participants: { some: { userId } } },
-  //   include: {
-  //     participants: { include: { user: true } },
-  //     messages: { orderBy: { createdAt: "desc" }, take: 1, include: { sender: true } },
-  //   },
-  //   orderBy: [{ lastMessageAt: "desc" }, { createdAt: "desc" }],
-  //   take: 10,
-  // });
+  if (activeConversationId) {
+    const messages = await prisma.message.findMany({
+      where: { conversationId: activeConversationId },
+      include: { sender: true },
+      orderBy: { createdAt: "asc" },
+      take: 30,
+    });
+
+    mappedMessages = messages.map((msg) => ({
+      id: msg.id,
+      sender:
+        msg.sender.firstname || msg.sender.lastname
+          ? `${msg.sender.firstname} ${msg.sender.lastname}`.trim()
+          : msg.sender.email,
+      message: msg.body ?? "",
+      time: formatTime(new Date(msg.createdAt)),
+      isMe: msg.senderId === userId,
+      avatar: initials(msg.sender.firstname, msg.sender.lastname, msg.sender.email),
+      avatarColor: pickColor(msg.senderId),
+    }));
+  }
 
   return NextResponse.json({
-    conversations: dummyConversations,
-    messages: dummyMessages,
+    conversations: mappedConversations,
+    messages: mappedMessages,
+  });
+}
+
+export async function POST(req: Request) {
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const userId = session.user.id;
+  const body = await req.json();
+  const { conversationId, recipientId, message } = body as {
+    conversationId?: string;
+    recipientId?: string;
+    message?: string;
+  };
+
+  if (!message || !message.trim()) {
+    return NextResponse.json({ error: "Message is required" }, { status: 400 });
+  }
+
+  if (!conversationId && !recipientId) {
+    return NextResponse.json({ error: "conversationId or recipientId is required" }, { status: 400 });
+  }
+
+  const text = message.trim();
+
+  let targetConversationId = conversationId;
+
+  // Validate or create conversation
+  if (targetConversationId) {
+    const participant = await prisma.conversationParticipant.findFirst({
+      where: { conversationId: targetConversationId, userId },
+      select: { id: true },
+    });
+    if (!participant) {
+      return NextResponse.json({ error: "Not a participant in this conversation" }, { status: 403 });
+    }
+  } else if (recipientId) {
+    // Ensure the recipient exists
+    const recipient = await prisma.user.findUnique({
+      where: { id: recipientId },
+      select: { id: true, firstname: true, lastname: true, email: true, role: true },
+    });
+
+    if (!recipient) {
+      return NextResponse.json({ error: "Recipient not found" }, { status: 404 });
+    }
+
+    // Find existing conversation between the two participants
+    const existingConversation = await prisma.conversation.findFirst({
+      where: {
+        participants: {
+          some: { userId },
+        },
+        AND: {
+          participants: {
+            some: { userId: recipientId },
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    if (existingConversation) {
+      targetConversationId = existingConversation.id;
+    } else {
+      // Create a new conversation
+      const myRole = (session.user as { role?: string }).role ?? "UNSET";
+      const recipientRole = recipient.role ?? "UNSET";
+      const normalizeRole = (role: string | null | undefined) =>
+        role && role in UserRole ? (role as keyof typeof UserRole) : "UNSET";
+
+      const newConversation = await prisma.conversation.create({
+        data: {
+          participants: {
+            create: [
+              { userId, role: UserRole[normalizeRole(myRole)] },
+              { userId: recipient.id, role: UserRole[normalizeRole(recipientRole)] },
+            ],
+          },
+        },
+      });
+      targetConversationId = newConversation.id;
+    }
+  }
+
+  if (!targetConversationId) {
+    return NextResponse.json({ error: "Unable to resolve conversation" }, { status: 400 });
+  }
+
+  const createdMessage = await prisma.message.create({
+    data: {
+      conversationId: targetConversationId,
+      senderId: userId,
+      body: text,
+    },
+  });
+
+  // Update last message timestamp
+  await prisma.conversation.update({
+    where: { id: targetConversationId },
+    data: { lastMessageAt: createdMessage.createdAt },
+  });
+
+  const conversation = await prisma.conversation.findUnique({
+    where: { id: targetConversationId },
+    include: {
+      participants: { include: { user: true } },
+      messages: {
+        include: { sender: true },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+    },
+  });
+
+  if (!conversation) {
+    return NextResponse.json({ error: "Conversation not found after sending" }, { status: 404 });
+  }
+
+  const otherParticipant =
+    conversation.participants.find((p) => p.userId !== userId)?.user ?? conversation.participants[0]?.user;
+  const name =
+    otherParticipant?.firstname || otherParticipant?.lastname
+      ? `${otherParticipant?.firstname ?? ""} ${otherParticipant?.lastname ?? ""}`.trim()
+      : otherParticipant?.email ?? "Conversation";
+  const avatarInitials = initials(otherParticipant?.firstname, otherParticipant?.lastname, otherParticipant?.email);
+  const lastMsg = conversation.messages[0];
+
+  const mappedConversation = {
+    id: conversation.id,
+    name,
+    avatar: avatarInitials,
+    avatarColor: pickColor(conversation.id),
+    lastMessage: lastMsg?.body ?? "",
+    time: lastMsg ? formatTime(new Date(lastMsg.createdAt)) : "",
+    unread: 0,
+    active: true,
+  };
+
+  const mappedMessage = {
+    id: createdMessage.id,
+    sender:
+      session.user.firstname || session.user.lastname
+        ? `${session.user.firstname ?? ""} ${session.user.lastname ?? ""}`.trim()
+        : session.user.email,
+    message: text,
+    time: formatTime(new Date(createdMessage.createdAt)),
+    isMe: true,
+    avatar: initials(session.user.firstname, session.user.lastname, session.user.email),
+    avatarColor: pickColor(userId),
+  };
+
+  return NextResponse.json({
+    conversation: mappedConversation,
+    message: mappedMessage,
   });
 }
