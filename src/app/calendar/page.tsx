@@ -16,7 +16,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Edit3, XCircle } from "lucide-react";
 
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
@@ -33,6 +33,9 @@ type Appointment = {
   client: string;
   color: string;
   zoomLink?: string;
+  status?: string;
+  therapistId?: string;
+  patientId?: string;
 };
 
 export default function CalendarPage() {
@@ -48,6 +51,12 @@ export default function CalendarPage() {
   const [duration, setDuration] = useState<number>(30);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [editDate, setEditDate] = useState<string>("");
+  const [editStartTime, setEditStartTime] = useState<string>("");
+  const [editDuration, setEditDuration] = useState<number>(30);
+  const [editError, setEditError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   const today = useMemo(() => new Date(), []);
   const weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -197,6 +206,96 @@ export default function CalendarPage() {
     }
   };
 
+  const handleSelectAppointment = (apt: Appointment) => {
+    setSelectedAppointment(apt);
+    const startDate = apt.start as Date;
+    setEditDate(startDate.toISOString().slice(0, 10));
+    setEditStartTime(startDate.toISOString().slice(11, 16));
+    setEditDuration(apt.durationMinutes);
+    setEditError(null);
+  };
+
+  const handleEditAppointment = async () => {
+    if (!selectedAppointment) return;
+    if (!editDate || !editStartTime || editDuration <= 0) {
+      setEditError("Please fill all fields");
+      return;
+    }
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const [hours, minutes] = editStartTime.split(":").map((v) => parseInt(v, 10));
+      const start = new Date(editDate);
+      start.setHours(hours, minutes, 0, 0);
+      const end = new Date(start.getTime() + editDuration * 60000);
+
+      const res = await fetch("/api/appointments", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          appointmentId: selectedAppointment.id,
+          startAt: start.toISOString(),
+          endAt: end.toISOString(),
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to update appointment");
+      }
+
+      const refresh = await fetch("/api/appointments");
+      if (refresh.ok) {
+        const data = (await refresh.json()) as { appointments?: Appointment[] };
+        setAppointments(
+          (data.appointments ?? []).map((apt) => ({
+            ...apt,
+            start: new Date(apt.start),
+            end: new Date(apt.end),
+          }))
+        );
+      }
+      setSelectedAppointment(null);
+    } catch (err: any) {
+      setEditError(err.message || "Unable to update appointment");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleCancelAppointment = async () => {
+    if (!selectedAppointment) return;
+    setEditSaving(true);
+    setEditError(null);
+    try {
+      const res = await fetch("/api/appointments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ appointmentId: selectedAppointment.id }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error || "Failed to cancel appointment");
+      }
+
+      const refresh = await fetch("/api/appointments");
+      if (refresh.ok) {
+        const data = (await refresh.json()) as { appointments?: Appointment[] };
+        setAppointments(
+          (data.appointments ?? []).map((apt) => ({
+            ...apt,
+            start: new Date(apt.start),
+            end: new Date(apt.end),
+          }))
+        );
+      }
+      setSelectedAppointment(null);
+    } catch (err: any) {
+      setEditError(err.message || "Unable to cancel appointment");
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
   return (
     <SidebarProvider>
       <AppSidebar user={user} />
@@ -319,7 +418,7 @@ export default function CalendarPage() {
                             }}
                             onClick={(e) => {
                               e.stopPropagation();
-                              if (apt.zoomLink) window.open(apt.zoomLink, "_blank", "noopener,noreferrer");
+                              handleSelectAppointment(apt);
                             }}
                           >
                             <p className="text-xs font-semibold line-clamp-1">{apt.client}</p>
@@ -401,6 +500,68 @@ export default function CalendarPage() {
                   <Button onClick={handleCreateAppointment} disabled={saving}>
                     {saving ? "Saving..." : "Create"}
                   </Button>
+                </div>
+              </div>
+            </div>
+          )}
+          {selectedAppointment && (
+            <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
+              <div className="bg-background w-full max-w-lg rounded-lg shadow-xl p-6 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold">Appointment</h3>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedAppointment.client} • {selectedAppointment.status ?? "SCHEDULED"}
+                    </p>
+                  </div>
+                  <Button variant="ghost" onClick={() => setSelectedAppointment(null)}>
+                    Close
+                  </Button>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>Date</Label>
+                      <Input type="date" value={editDate} onChange={(e) => setEditDate(e.target.value)} disabled={!isTherapist} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label>Start time</Label>
+                      <Input type="time" value={editStartTime} onChange={(e) => setEditStartTime(e.target.value)} disabled={!isTherapist} />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Duration (minutes)</Label>
+                    <Input
+                      type="number"
+                      min={15}
+                      step={15}
+                      value={editDuration}
+                      onChange={(e) => setEditDuration(Number(e.target.value) || 0)}
+                      disabled={!isTherapist}
+                    />
+                  </div>
+                  {editError && <p className="text-sm text-destructive">{editError}</p>}
+                </div>
+
+                <div className="flex justify-between pt-2">
+                  <div>
+                    {!isTherapist && selectedAppointment.patientId === user.id && (
+                      <Button variant="destructive" onClick={handleCancelAppointment} disabled={editSaving}>
+                        {editSaving ? "Cancelling..." : <><XCircle className="h-4 w-4 mr-2" />Cancel</>}
+                      </Button>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" onClick={() => setSelectedAppointment(null)} disabled={editSaving}>
+                      Close
+                    </Button>
+                    {isTherapist && selectedAppointment.therapistId === user.id && (
+                      <Button onClick={handleEditAppointment} disabled={editSaving}>
+                        {editSaving ? "Saving..." : <><Edit3 className="h-4 w-4 mr-2" />Save</>}
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

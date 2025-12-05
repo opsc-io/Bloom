@@ -52,6 +52,9 @@ export async function GET(req: Request) {
       client,
       color: pickColor(appt.id),
       zoomLink: appt.zoomJoinUrl ?? undefined,
+      status: appt.status,
+      therapistId: appt.therapistId,
+      patientId: appt.patientId,
     };
   });
 
