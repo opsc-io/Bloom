@@ -1,5 +1,6 @@
 "use client";
 
+import React, { Suspense, useEffect, useState } from "react";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -18,11 +19,12 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Send, MessageSquarePlus } from "lucide-react";
+import { Search, Send, MessageSquarePlus, Smile } from "lucide-react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
-import { useEffect, useState } from "react";
+
+export const dynamic = "force-dynamic";
 
 type Conversation = {
   id: string;
@@ -43,19 +45,49 @@ type Message = {
   isMe: boolean;
   avatar: string;
   avatarColor: string;
+  reactions?: { emoji: string; count: number }[];
 };
 
-export default function MessagesPage() {
+function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const messageUserId = searchParams.get("message");
   const { data: session, isPending } = useSession();
-  
+
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [activeConversation, setActiveConversation] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState("");
   const [conversationSearch, setConversationSearch] = useState("");
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
+
+  const commonEmojis = ["👍", "❤️", "😊", "😂", "🎉", "👏"];
+
+  const handleReaction = (messageId: string, emoji: string) => {
+    setMessages((prevMessages) =>
+      prevMessages.map((msg) => {
+        if (msg.id === messageId) {
+          const reactions = msg.reactions || [];
+          const existingReaction = reactions.find((r) => r.emoji === emoji);
+          if (existingReaction) {
+            return {
+              ...msg,
+              reactions: reactions.map((r) =>
+                r.emoji === emoji ? { ...r, count: r.count + 1 } : r
+              ),
+            };
+          }
+          return {
+            ...msg,
+            reactions: [...reactions, { emoji, count: 1 }],
+          };
+        }
+        return msg;
+      })
+    );
+    setShowEmojiPicker(null);
+  };
 
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -78,7 +110,6 @@ export default function MessagesPage() {
         setConversations(data.conversations ?? []);
         setMessages(data.messages ?? []);
 
-        // Determine active conversation: query param, existing active, or first available
         const convIds = (data.conversations ?? []).map((c: Conversation) => c.id);
         if (activeConversation && !convIds.includes(activeConversation)) {
           setActiveConversation(data.conversations?.[0]?.id ?? null);
@@ -86,14 +117,13 @@ export default function MessagesPage() {
           if (messageUserId && convIds.includes(messageUserId)) {
             setActiveConversation(messageUserId);
           } else if (messageUserId) {
-            // allow starting a new conversation with a user id from the query param
             setActiveConversation(messageUserId);
           } else if (data.conversations?.length > 0) {
             setActiveConversation(data.conversations[0].id);
           }
         }
       } catch {
-        // Handle error silently
+        // ignore to keep page usable
       }
     };
 
@@ -121,11 +151,9 @@ export default function MessagesPage() {
         body: JSON.stringify(payload),
       });
 
-      if (!res.ok) {
-        return;
-      }
+      if (!res.ok) return;
 
-      const data = await res.json() as { conversation?: Conversation; message?: Message };
+      const data = (await res.json()) as { conversation?: Conversation; message?: Message };
       if (data.conversation) {
         setConversations((prev) => {
           const filtered = prev.filter((c) => c.id !== data.conversation!.id).map((c) => ({ ...c, active: false }));
@@ -137,6 +165,8 @@ export default function MessagesPage() {
         setMessages((prev) => [...prev, data.message!]);
       }
       setNewMessage("");
+      setShowEmojiPicker(null);
+      setIsTyping(false);
     } catch {
       // ignore errors for now
     }
@@ -148,10 +178,8 @@ export default function MessagesPage() {
 
   const activeConv = conversations.find((c) => c.id === activeConversation);
 
-  if (isPending)
-    return <p className="text-center mt-8 text-white">Loading...</p>;
-  if (!session?.user)
-    return <p className="text-center mt-8 text-white">Redirecting...</p>;
+  if (isPending) return <p className="text-center mt-8 text-white">Loading...</p>;
+  if (!session?.user) return <p className="text-center mt-8 text-white">Redirecting...</p>;
 
   const { user } = session;
 
@@ -175,18 +203,26 @@ export default function MessagesPage() {
           </Breadcrumb>
         </header>
 
-        <div className="flex flex-1 flex-col">
-          <div className="flex-1 bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg">
-            <div className="p-6 border-b">
-              <h2 className="text-xl font-semibold">Messages</h2>
-              <p className="text-sm text-muted-foreground mt-1">
-                Communicate with your patients and therapists
-              </p>
+        <div className="flex flex-1 flex-col p-4 h-[calc(100vh-4rem)] overflow-hidden">
+          <div className="flex-1 bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg flex flex-col overflow-hidden">
+            <div className="p-6 border-b flex-shrink-0">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Messages</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Communicate with your patients and therapists
+                  </p>
+                </div>
+                <Button variant="outline" size="sm" className="gap-2">
+                  <MessageSquarePlus className="h-4 w-4" />
+                  New Message
+                </Button>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 h-[calc(100vh-240px)]">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 flex-1 min-h-0">
               {/* Conversations List */}
-              <div className="md:col-span-1 border-r p-4">
-                <div className="relative mb-4">
+              <div className="md:col-span-1 border-r p-4 overflow-hidden flex flex-col h-full">
+                <div className="relative mb-4 flex-shrink-0">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     placeholder="Search conversations..."
@@ -195,81 +231,96 @@ export default function MessagesPage() {
                     className="pl-9 bg-muted/50"
                   />
                 </div>
-                <div className="space-y-1 overflow-y-auto h-[calc(100vh-340px)]">
-                      {filteredConversations.map((conversation) => (
-                        <div
-                          key={conversation.id}
-                          onClick={() => setActiveConversation(conversation.id)}
-                          className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
-                            activeConversation === conversation.id
-                              ? "bg-muted"
-                              : "hover:bg-muted/50"
-                          }`}
-                        >
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback className={conversation.avatarColor}>
-                              {conversation.avatar}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className="text-sm font-medium truncate">
-                                {conversation.name}
-                              </p>
-                              <span className="text-xs text-muted-foreground">
-                                {conversation.time}
-                              </span>
-                            </div>
-                            <p className="text-xs text-muted-foreground truncate">
-                              {conversation.lastMessage}
-                            </p>
-                          </div>
-                          {conversation.unread > 0 && (
-                            <div className="flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs">
-                              {conversation.unread}
-                            </div>
-                          )}
+                <div className="space-y-1 overflow-y-auto flex-1">
+                  {filteredConversations.map((conversation) => (
+                    <div
+                      key={conversation.id}
+                      onClick={() => setActiveConversation(conversation.id)}
+                      className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
+                        activeConversation === conversation.id
+                          ? "bg-muted"
+                          : "hover:bg-muted/50"
+                      }`}
+                    >
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className={conversation.avatarColor}>
+                          {conversation.avatar}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="text-sm font-medium truncate">
+                            {conversation.name}
+                          </p>
+                          <span className="text-xs text-muted-foreground">
+                            {conversation.time}
+                          </span>
                         </div>
-                      ))}
+                        <p className="text-xs text-muted-foreground truncate">
+                          {conversation.lastMessage}
+                        </p>
+                      </div>
+                      {conversation.unread > 0 && (
+                        <div className="flex items-center justify-center h-5 w-5 rounded-full bg-primary text-primary-foreground text-xs">
+                          {conversation.unread}
+                        </div>
+                      )}
                     </div>
-                  </div>
+                  ))}
+                </div>
+              </div>
 
-                  {/* Messages Area */}
-                  <div className="md:col-span-2 flex flex-col">
-                    {activeConv ? (
-                      <div className="flex flex-col h-full p-4">
-                        {/* Chat Header */}
-                        <div className="flex items-center gap-3 pb-4 border-b mb-4">
-                          <Avatar className="h-10 w-10">
-                            <AvatarFallback className={activeConv.avatarColor}>
-                              {activeConv.avatar}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="font-medium">{activeConv.name}</p>
-                            <p className="text-xs text-muted-foreground">Active now</p>
-                          </div>
-                        </div>
+              {/* Messages Area */}
+              <div className="md:col-span-2 flex flex-col min-h-0">
+                {activeConv ? (
+                  <div className="flex flex-col h-full p-4">
+                    {/* Chat Header */}
+                    <div className="flex items-center gap-3 pb-4 border-b mb-4 flex-shrink-0">
+                      <Avatar className="h-10 w-10">
+                        <AvatarFallback className={activeConv.avatarColor}>
+                          {activeConv.avatar}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <p className="font-medium">{activeConv.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {isTyping ? (
+                            <span className="flex items-center gap-1">
+                              <span className="animate-pulse">typing</span>
+                              <span className="flex gap-0.5">
+                                <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "0ms" }}></span>
+                                <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "150ms" }}></span>
+                                <span className="w-1 h-1 bg-current rounded-full animate-bounce" style={{ animationDelay: "300ms" }}></span>
+                              </span>
+                            </span>
+                          ) : (
+                            "Active now"
+                          )}
+                        </p>
+                      </div>
+                    </div>
 
-                        {/* Messages */}
-                        <div className="flex-1 overflow-y-auto space-y-4 mb-4 pr-2">
-                          {messages.map((msg) => (
+                    {/* Messages */}
+                    <div className="flex-1 overflow-y-auto pr-2 min-h-0">
+                      <div className="space-y-4">
+                        {messages.map((msg) => (
+                          <div
+                            key={msg.id}
+                            className={`flex gap-3 ${msg.isMe ? "justify-end" : ""} group`}
+                          >
+                            {!msg.isMe && (
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className={msg.avatarColor}>
+                                  {msg.avatar}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
                             <div
-                              key={msg.id}
-                              className={`flex gap-3 ${msg.isMe ? "justify-end" : ""}`}
+                              className={`flex flex-col gap-1 max-w-[70%] relative ${
+                                msg.isMe ? "items-end" : ""
+                              }`}
                             >
-                              {!msg.isMe && (
-                                <Avatar className="h-8 w-8">
-                                  <AvatarFallback className={msg.avatarColor}>
-                                    {msg.avatar}
-                                  </AvatarFallback>
-                                </Avatar>
-                              )}
-                              <div
-                                className={`flex flex-col gap-1 max-w-[70%] ${
-                                  msg.isMe ? "items-end" : ""
-                                }`}
-                              >
+                              <div className="relative">
                                 <div
                                   className={`rounded-lg px-4 py-2 ${
                                     msg.isMe
@@ -279,64 +330,169 @@ export default function MessagesPage() {
                                 >
                                   <p className="text-sm">{msg.message}</p>
                                 </div>
-                                <span className="text-xs text-muted-foreground">
-                                  {msg.time}
-                                </span>
-                              </div>
-                              {msg.isMe && (
-                                <Avatar className="h-8 w-8">
-                                  <AvatarFallback className={msg.avatarColor}>
-                                    {msg.avatar}
-                                  </AvatarFallback>
-                                </Avatar>
-                              )}
-                            </div>
-                          ))}
-                        </div>
 
-                        {/* Message Input */}
-                        <div className="flex gap-2 pt-4 border-t">
-                          <Input
-                            placeholder="Type a message..."
-                            value={newMessage}
-                            onChange={(e) => setNewMessage(e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === "Enter" && !e.shiftKey) {
-                                e.preventDefault();
-                                handleSendMessage();
-                              }
-                            }}
-                            className="flex-1"
-                          />
-                          <Button onClick={handleSendMessage} size="icon">
-                            <Send className="h-4 w-4" />
-                          </Button>
-                        </div>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className={`absolute -bottom-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-background border shadow-sm ${
+                                    msg.isMe ? "right-0" : "left-0"
+                                  }`}
+                                  onClick={() =>
+                                    setShowEmojiPicker(
+                                      showEmojiPicker === msg.id ? null : msg.id
+                                    )
+                                  }
+                                >
+                                  <Smile className="h-3 w-3" />
+                                </Button>
+
+                                {showEmojiPicker === msg.id && (
+                                  <div
+                                    className={`absolute bottom-8 bg-background border rounded-lg shadow-lg p-2 flex gap-1 z-10 ${
+                                      msg.isMe ? "right-0" : "left-0"
+                                    }`}
+                                  >
+                                    {commonEmojis.map((emoji) => (
+                                      <button
+                                        key={emoji}
+                                        onClick={() => handleReaction(msg.id, emoji)}
+                                        className="hover:bg-muted rounded p-1 text-lg transition-colors"
+                                      >
+                                        {emoji}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {msg.reactions && msg.reactions.length > 0 && (
+                                <div className="flex gap-1 flex-wrap">
+                                  {msg.reactions.map((reaction, idx) => (
+                                    <div
+                                      key={idx}
+                                      className="bg-background border rounded-full px-2 py-0.5 text-xs flex items-center gap-1 cursor-pointer hover:bg-muted transition-colors"
+                                      onClick={() => handleReaction(msg.id, reaction.emoji)}
+                                    >
+                                      <span>{reaction.emoji}</span>
+                                      <span className="text-muted-foreground">{reaction.count}</span>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+
+                              <span className="text-xs text-muted-foreground">
+                                {msg.time}
+                              </span>
+                            </div>
+                            {msg.isMe && (
+                              <Avatar className="h-8 w-8">
+                                <AvatarFallback className={msg.avatarColor}>
+                                  {msg.avatar}
+                                </AvatarFallback>
+                              </Avatar>
+                            )}
+                          </div>
+                        ))}
+
+                        {isTyping && (
+                          <div className="flex gap-3 justify-end animate-in fade-in slide-in-from-bottom-2 duration-300">
+                            <div className="flex flex-col gap-1 items-end">
+                              <div className="rounded-lg px-4 py-3 bg-primary/10 border border-primary/20">
+                                <div className="flex gap-1.5">
+                                  <span
+                                    className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                                    style={{ animationDelay: "0ms", animationDuration: "1s" }}
+                                  ></span>
+                                  <span
+                                    className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                                    style={{ animationDelay: "150ms", animationDuration: "1s" }}
+                                  ></span>
+                                  <span
+                                    className="w-2 h-2 bg-primary/60 rounded-full animate-bounce"
+                                    style={{ animationDelay: "300ms", animationDuration: "1s" }}
+                                  ></span>
+                                </div>
+                              </div>
+                            </div>
+                            <Avatar className="h-8 w-8 animate-in zoom-in duration-300">
+                              <AvatarFallback className="bg-blue-500">
+                                {(
+                                  (user as any)?.firstname?.[0] ||
+                                  (user as any)?.name?.[0] ||
+                                  "Y"
+                                ).toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className="flex flex-col h-full relative p-4">
-                        <div className="flex-1 flex items-center justify-center text-muted-foreground">
-                          <p>Select a conversation to start messaging</p>
-                        </div>
-                        
-                        {/* Message Input Bar - Always visible at bottom */}
-                        <div className="flex gap-2 pt-4 border-t">
-                          <Input 
-                            placeholder="Type a message..." 
-                            className="flex-1"
-                            disabled
-                          />
-                          <Button size="icon" className="shrink-0" disabled>
-                            <Send className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
+                    </div>
+
+                    {/* Message Input */}
+                    <div className="flex gap-2 pt-4 border-t flex-shrink-0">
+                      <Input
+                        placeholder="Type a message..."
+                        value={newMessage}
+                        onChange={(e) => {
+                          setNewMessage(e.target.value);
+                          if (e.target.value.trim()) {
+                            setIsTyping(true);
+                          } else {
+                            setIsTyping(false);
+                          }
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" && !e.shiftKey) {
+                            e.preventDefault();
+                            handleSendMessage();
+                            setIsTyping(false);
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={() => {
+                          handleSendMessage();
+                          setIsTyping(false);
+                        }}
+                        size="icon"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex flex-col h-full relative p-4">
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground min-h-0">
+                      <p>Select a conversation to start messaging</p>
+                    </div>
+
+                    {/* Message Input Bar - Always visible at bottom */}
+                    <div className="flex gap-2 pt-4 border-t flex-shrink-0">
+                      <Input
+                        placeholder="Type a message..."
+                        className="flex-1"
+                        disabled
+                      />
+                      <Button size="icon" className="shrink-0" disabled>
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          </SidebarInset>
-        </SidebarProvider>
-      );
-    }
+          </div>
+        </div>
+      </SidebarInset>
+    </SidebarProvider>
+  );
+}
+
+export default function MessagesPage() {
+  return (
+    <Suspense fallback={<p className="p-4">Loading messages...</p>}>
+      <MessagesContent />
+    </Suspense>
+  );
+}
