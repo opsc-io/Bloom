@@ -90,6 +90,13 @@ async function main() {
       console.error("Failed to join rooms", err);
     }
 
+    socket.on("join", async ({ conversationId }: { conversationId?: string }) => {
+      if (!conversationId) return;
+      const isParticipant = await userIsParticipant(userId, conversationId);
+      if (!isParticipant) return;
+      socket.join(conversationId);
+    });
+
     socket.on("typing", async ({ conversationId }: { conversationId?: string }) => {
       if (!conversationId) return;
       const isParticipant = await userIsParticipant(userId, conversationId);

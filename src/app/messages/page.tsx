@@ -125,6 +125,12 @@ function MessagesContent() {
             setActiveConversation(data.conversations[0].id);
           }
         }
+
+        // Join the first/active conversation room for typing signals
+        const joinId = activeConversation ?? data.conversations?.[0]?.id;
+        if (joinId && socketRef.current) {
+          socketRef.current.emit("join", { conversationId: joinId });
+        }
       } catch {
         // ignore to keep page usable
       }
@@ -135,6 +141,12 @@ function MessagesContent() {
       cancelled = true;
     };
   }, [isPending, session, messageUserId, activeConversation]);
+
+  // Join active conversation room for typing updates when it changes
+  useEffect(() => {
+    if (!activeConversation || !socketRef.current) return;
+    socketRef.current.emit("join", { conversationId: activeConversation });
+  }, [activeConversation]);
 
   useEffect(() => {
     if (isPending || !session?.user) return;
