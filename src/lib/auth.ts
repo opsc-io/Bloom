@@ -62,7 +62,13 @@ export const auth = betterAuth({
   ].filter(Boolean),
   emailAndPassword: {
     enabled: true,
+    disableSignUp: false,
     requireEmailVerification: true,
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
+    autoSignIn: true,
+    // Using Better Auth's default scrypt-based hashing (from better-auth/crypto)
+    // This is compatible with Vercel Edge Runtime and matches seed-admin.ts
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({
         to: user.email,
@@ -103,6 +109,11 @@ export const auth = betterAuth({
         type: 'string',
         input: false,
         default: 'UNSET',
+      },
+      administrator: {
+        type: 'boolean',
+        input: false,
+        default: false,
       },
     },
   },

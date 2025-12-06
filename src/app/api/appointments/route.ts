@@ -17,10 +17,14 @@ export async function GET(req: Request) {
   const userId = session.user.id;
   const isTherapist = session.user.role === "THERAPIST";
 
+  // Support weekOffset parameter for viewing different weeks
+  const url = new URL(req.url);
+  const weekOffset = parseInt(url.searchParams.get("weekOffset") ?? "0", 10) || 0;
+
   const now = new Date();
   const startOfWeek = new Date(now);
   startOfWeek.setHours(0, 0, 0, 0);
-  startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7)); // Monday
+  startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7) + weekOffset * 7); // Monday + offset
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(endOfWeek.getDate() + 7);
 
@@ -52,8 +56,131 @@ export async function GET(req: Request) {
       client,
       color: pickColor(appt.id),
       zoomLink: appt.zoomJoinUrl ?? undefined,
+      status: appt.status,
+      therapistId: appt.therapistId,
+      patientId: appt.patientId,
     };
   });
 
   return NextResponse.json({ appointments: formatted });
+}
+
+export async function POST(req: Request) {
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const { startAt, endAt, participantId } = body as {
+    startAt?: string;
+    endAt?: string;
+    participantId?: string;
+  };
+
+  if (!startAt || !endAt || !participantId) {
+    return NextResponse.json({ error: "startAt, endAt and participantId are required" }, { status: 400 });
+  }
+
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    return NextResponse.json({ error: "Invalid date format" }, { status: 400 });
+  }
+  if (end <= start) {
+    return NextResponse.json({ error: "endAt must be after startAt" }, { status: 400 });
+  }
+
+  const isTherapist = session.user.role === "THERAPIST";
+  const therapistId = isTherapist ? session.user.id : participantId;
+  const patientId = isTherapist ? participantId : session.user.id;
+
+  // Ensure participant exists
+  const otherUser = await prisma.user.findUnique({
+    where: { id: participantId },
+    select: { id: true },
+  });
+  if (!otherUser) {
+    return NextResponse.json({ error: "Participant not found" }, { status: 404 });
+  }
+
+  const appt = await prisma.appointment.create({
+    data: {
+      therapistId,
+      patientId,
+      startAt: start,
+      endAt: end,
+      status: "SCHEDULED",
+    },
+  });
+
+  return NextResponse.json({ appointmentId: appt.id });
+}
+
+export async function PATCH(req: Request) {
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const { appointmentId, startAt, endAt } = body as { appointmentId?: string; startAt?: string; endAt?: string };
+  if (!appointmentId || !startAt || !endAt) {
+    return NextResponse.json({ error: "appointmentId, startAt and endAt are required" }, { status: 400 });
+  }
+
+  const appt = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: { id: true, therapistId: true },
+  });
+  if (!appt) {
+    return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+  }
+
+  if (appt.therapistId !== session.user.id) {
+    return NextResponse.json({ error: "Only the therapist can edit this appointment" }, { status: 403 });
+  }
+
+  const start = new Date(startAt);
+  const end = new Date(endAt);
+  if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
+    return NextResponse.json({ error: "Invalid start/end times" }, { status: 400 });
+  }
+
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: {
+      startAt: start,
+      endAt: end,
+      status: "SCHEDULED",
+    },
+  });
+
+  return NextResponse.json({ success: true });
+}
+
+export async function DELETE(req: Request) {
+  const session = await auth.api.getSession({ headers: req.headers });
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const body = await req.json();
+  const { appointmentId } = body as { appointmentId?: string };
+  if (!appointmentId) {
+    return NextResponse.json({ error: "appointmentId is required" }, { status: 400 });
+  }
+
+  const appt = await prisma.appointment.findUnique({
+    where: { id: appointmentId },
+    select: { id: true, patientId: true },
+  });
+  if (!appt) {
+    return NextResponse.json({ error: "Appointment not found" }, { status: 404 });
+  }
+
+  if (appt.patientId !== session.user.id) {
+    return NextResponse.json({ error: "Only the patient can cancel this appointment" }, { status: 403 });
+  }
+
+  await prisma.appointment.update({
+    where: { id: appointmentId },
+    data: { status: "CANCELLED" },
+  });
+
+  return NextResponse.json({ success: true });
 }

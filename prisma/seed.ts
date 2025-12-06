@@ -1,96 +1,195 @@
-import { faker } from "@faker-js/faker";
-import prisma from "../src/lib/prisma";
+import { PrismaClient, UserRole } from '../src/generated/prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { hashPassword } from 'better-auth/crypto';
 
-const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('DATABASE_URL environment variable is required');
+}
 
-async function seedUsers() {
-  const therapist = await prisma.user.upsert({
-    where: { email: "therapist@example.com" },
-    update: {},
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
+
+const PASSWORD = 'Password123!';
+
+// Sample data
+const therapists = [
+  { firstname: 'Sarah', lastname: 'Johnson', email: 'therapist1@example.com' },
+  { firstname: 'Michael', lastname: 'Chen', email: 'therapist2@example.com' },
+  { firstname: 'Emily', lastname: 'Rodriguez', email: 'therapist3@example.com' },
+  { firstname: 'David', lastname: 'Kim', email: 'therapist4@example.com' },
+  { firstname: 'Jessica', lastname: 'Patel', email: 'therapist5@example.com' },
+];
+
+const patients = [
+  { firstname: 'James', lastname: 'Wilson', email: 'patient1@example.com' },
+  { firstname: 'Emma', lastname: 'Brown', email: 'patient2@example.com' },
+  { firstname: 'Oliver', lastname: 'Davis', email: 'patient3@example.com' },
+  { firstname: 'Sophia', lastname: 'Martinez', email: 'patient4@example.com' },
+  { firstname: 'William', lastname: 'Garcia', email: 'patient5@example.com' },
+];
+
+async function createUser(
+  data: { firstname: string; lastname: string; email: string },
+  role: UserRole,
+  hashedPassword: string
+) {
+  const id = crypto.randomUUID();
+  const name = `${data.firstname} ${data.lastname}`;
+
+  const user = await prisma.user.upsert({
+    where: { email: data.email },
+    update: {
+      firstname: data.firstname,
+      lastname: data.lastname,
+      name,
+      role,
+      emailVerified: true,
+    },
     create: {
-      id: faker.string.uuid(),
-      firstname: capitalize(faker.person.firstName()),
-      lastname: capitalize(faker.person.lastName()),
-      name: "Therapist Seed",
-      email: "therapist@example.com",
-      role: "THERAPIST",
+      id,
+      email: data.email,
+      firstname: data.firstname,
+      lastname: data.lastname,
+      name,
+      role,
+      emailVerified: true,
     },
   });
 
-  const patients = await Promise.all(
-    Array.from({ length: 3 }, (_, idx) =>
-      prisma.user.upsert({
-        where: { email: `patient${idx + 1}@example.com` },
-        update: {},
-        create: {
-          id: faker.string.uuid(),
-          firstname: capitalize(faker.person.firstName()),
-          lastname: capitalize(faker.person.lastName()),
-          name: `Patient ${idx + 1}`,
-          email: `patient${idx + 1}@example.com`,
-          role: "PATIENT",
-        },
-      })
-    )
-  );
+  // Upsert credential account
+  await prisma.account.upsert({
+    where: { id: `${user.id}-credential` },
+    update: { password: hashedPassword },
+    create: {
+      id: `${user.id}-credential`,
+      userId: user.id,
+      accountId: user.id,
+      providerId: 'credential',
+      password: hashedPassword,
+    },
+  });
 
-  return { therapist, patients };
+  return user;
 }
 
-async function seedConversations({ therapist, patients }: Awaited<ReturnType<typeof seedUsers>>) {
-  await prisma.$transaction([
-    prisma.messageReaction.deleteMany(),
-    prisma.messageAttachment.deleteMany(),
-    prisma.message.deleteMany(),
-    prisma.conversationParticipant.deleteMany(),
-    prisma.conversation.deleteMany(),
-  ]);
+function daysFromNow(days: number, hour = 10, minutes = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(hour, minutes, 0, 0);
+  return d;
+}
 
-  const conversations = [];
+async function seed() {
+  console.log('Seeding database...');
 
-  for (const patient of patients) {
-    const messageCount = faker.number.int({ min: 3, max: 6 });
-    const messages = Array.from({ length: messageCount }, (_, idx) => ({
-      body: faker.lorem.sentences(2),
-      sender: { connect: { id: idx % 2 === 0 ? therapist.id : patient.id } },
-      createdAt: faker.date.recent({ days: 5 }),
-    })).sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0));
+  // Hash password once (same for all test users)
+  const hashedPassword = await hashPassword(PASSWORD);
 
-    const convo = await prisma.conversation.create({
+  // Create therapists
+  console.log('Creating therapists...');
+  const createdTherapists = [];
+  for (const t of therapists) {
+    const user = await createUser(t, UserRole.THERAPIST, hashedPassword);
+    createdTherapists.push(user);
+    console.log(`  Created therapist: ${user.email}`);
+  }
+
+  // Create patients
+  console.log('Creating patients...');
+  const createdPatients = [];
+  for (const p of patients) {
+    const user = await createUser(p, UserRole.PATIENT, hashedPassword);
+    createdPatients.push(user);
+    console.log(`  Created patient: ${user.email}`);
+  }
+
+  // Create some appointments
+  console.log('Creating appointments...');
+  for (let i = 0; i < createdPatients.length; i++) {
+    const patient = createdPatients[i];
+    const therapist = createdTherapists[i % createdTherapists.length];
+
+    // Upcoming appointment
+    await prisma.appointment.create({
       data: {
-        lastMessageAt: messages[messages.length - 1]?.createdAt ?? new Date(),
+        therapistId: therapist.id,
+        patientId: patient.id,
+        startAt: daysFromNow(i + 1, 9, 0),
+        endAt: daysFromNow(i + 1, 9, 45),
+        status: 'SCHEDULED',
+      },
+    });
+
+    // Past completed appointment
+    await prisma.appointment.create({
+      data: {
+        therapistId: therapist.id,
+        patientId: patient.id,
+        startAt: daysFromNow(-(i + 1), 14, 0),
+        endAt: daysFromNow(-(i + 1), 14, 45),
+        status: 'COMPLETED',
+      },
+    });
+
+    console.log(`  Created appointments for ${patient.email} with ${therapist.email}`);
+  }
+
+  // Create some conversations
+  console.log('Creating conversations...');
+  for (let i = 0; i < 3; i++) {
+    const patient = createdPatients[i];
+    const therapist = createdTherapists[i];
+
+    const conversation = await prisma.conversation.create({
+      data: {
         participants: {
           create: [
-            { role: "THERAPIST", user: { connect: { id: therapist.id } } },
-            { role: "PATIENT", user: { connect: { id: patient.id } } },
+            { userId: therapist.id, role: UserRole.THERAPIST },
+            { userId: patient.id, role: UserRole.PATIENT },
           ],
-        },
-        messages: {
-          create: messages,
         },
       },
     });
 
-    conversations.push(convo);
+    // Add some messages
+    const messages = [
+      { senderId: therapist.id, body: 'Hi there! How are you feeling today?' },
+      { senderId: patient.id, body: "I'm doing better, thanks for asking." },
+      { senderId: therapist.id, body: 'Great to hear! Looking forward to our session.' },
+    ];
+
+    for (const msg of messages) {
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          senderId: msg.senderId,
+          body: msg.body,
+        },
+      });
+    }
+
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { lastMessageAt: new Date() },
+    });
+
+    console.log(`  Created conversation between ${therapist.email} and ${patient.email}`);
   }
 
-  return conversations;
+  console.log('\nSeed complete!');
+  console.log('-------------------');
+  console.log('Test credentials:');
+  console.log(`  Password for all users: ${PASSWORD}`);
+  console.log('\nTherapists:');
+  createdTherapists.forEach((t) => console.log(`  - ${t.email}`));
+  console.log('\nPatients:');
+  createdPatients.forEach((p) => console.log(`  - ${p.email}`));
 }
 
-async function main() {
-  const users = await seedUsers();
-  const conversations = await seedConversations(users);
-
-  console.log("Seeded therapist:", users.therapist.email);
-  console.log("Seeded patients:", users.patients.map((p) => p.email));
-  console.log("Seeded conversations:", conversations.map((c) => c.id));
-}
-
-main()
-  .catch((error) => {
-    console.error("Seeding failed:", error);
+seed()
+  .catch((err) => {
+    console.error('Seeding failed:', err);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());

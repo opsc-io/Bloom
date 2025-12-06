@@ -62,6 +62,14 @@ export default function DashboardPage() {
   useEffect(() => {
     if (!isPending && !session?.user) {
       router.push("/sign-in");
+      return;
+    }
+    // Redirect administrators to admin dashboard
+    if (!isPending && session?.user) {
+      const isAdmin = (session.user as { administrator?: boolean }).administrator === true;
+      if (isAdmin) {
+        router.push("/admin");
+      }
     }
   }, [isPending, session, router]);
 
