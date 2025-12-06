@@ -215,40 +215,26 @@ seed()
 async function seedAdmin() {
   const email = 'admin@bloomhealth.us';
   const password = 'Admin1234!';
-  const hashedPassword = await hashPassword(password);
-  const id = crypto.randomUUID();
 
-  // Upsert admin user
-  const admin = await prisma.user.upsert({
-    where: { email },
-    update: {
-      role: UserRole.ADMINISTRATOR,
-      administrator: true,
-    },
-    create: {
-      id,
-      email,
-      firstname: 'Admin',
-      lastname: 'User',
-      name: 'Admin User',
-      role: UserRole.ADMINISTRATOR,
-      administrator: true,
-      emailVerified: true,
-    },
-  });
+  //create admin using better-auth
+  let admin = await prisma.user.findUnique({ where: { email } });
+  if (!admin) {
+    await auth.api.signUpEmail({
+      body: {
+        email,
+        password,
+        name: 'Admin User',
+        firstname: 'Admin',
+        lastname: 'User',
+      },
+    });
+    admin = await prisma.user.findUnique({ where: { email } });
+    if (!admin) {
+      throw new Error(`Failed to create admin user via Better Auth: ${email}`);
+    }
+  };
 
-  // Upsert credential account with password
-  await prisma.account.upsert({
-    where: { id: `${admin.id}-credential` },
-    update: { password: hashedPassword },
-    create: {
-      id: `${admin.id}-credential`,
-      userId: admin.id,
-      accountId: admin.id,
-      providerId: 'credential',
-      password: hashedPassword,
-    },
-  });
+
 
   console.log('Admin user created:', admin.email);
 }
