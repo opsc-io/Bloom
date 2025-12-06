@@ -295,6 +295,7 @@ function MessagesContent() {
   if (!session?.user) return <p className="text-center mt-8 text-white">Redirecting...</p>;
 
   const { user } = session;
+  const userRole = (user as { role?: string }).role || "UNSET";
 
   return (
     <SidebarProvider>
@@ -445,7 +446,7 @@ function MessagesContent() {
                                 <p className="text-sm">{msg.message}</p>
                               </div>
 
-                              {!msg.isMe && (
+                              {!msg.isMe && userRole === "practitioner" && (
                                 <div className="relative group/insight">
                                   <Button
                                     size="icon"
