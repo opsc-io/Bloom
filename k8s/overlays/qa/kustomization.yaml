@@ -20,10 +20,13 @@ labels:
 images:
   - name: gcr.io/PROJECT_ID/bloom-app
     newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-app
-    newTag: latest
+    newTag: qa-latest
   - name: gcr.io/PROJECT_ID/bloom-socket
     newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-socket
-    newTag: latest
+    newTag: qa-latest
+  - name: gcr.io/PROJECT_ID/bloom-db-init
+    newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-db-init
+    newTag: qa-latest
 
 # All patches in a single section
 patches:
