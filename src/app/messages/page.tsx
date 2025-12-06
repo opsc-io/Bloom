@@ -49,6 +49,7 @@ type Message = {
   reactions?: { emoji: string; count: number }[];
 };
 
+
 function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -59,7 +60,7 @@ function MessagesContent() {
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
-  const [activeConversation, setActiveConversation] = useState<string | null>(null);
+  const [activeConversation, setActiveConversation] = useState<string | null>(requestedConversationId ?? null);
   const [newMessage, setNewMessage] = useState("");
   const [conversationSearch, setConversationSearch] = useState("");
   const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
@@ -313,7 +314,7 @@ function MessagesContent() {
           </Breadcrumb>
         </header>
 
-        <div className="flex flex-1 flex-col p-4 h-[calc(100vh-4rem)] overflow-hidden">
+        <div className="flex flex-1 flex-col p-4 h-[calc(100vh-4rem)] max-h-[calc(100vh-4rem)] min-h-[calc(100vh-4rem)] overflow-hidden">
           <div className="flex-1 bg-card/50 backdrop-blur-sm border border-border/50 rounded-lg flex flex-col overflow-hidden">
             <div className="p-6 border-b flex-shrink-0">
               <div className="flex items-center justify-between">
@@ -329,19 +330,21 @@ function MessagesContent() {
                 </Button>
               </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 flex-1 min-h-0">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-0 flex-1 min-h-0 h-full max-h-full">
               {/* Conversations List */}
-              <div className="md:col-span-1 border-r p-4 overflow-hidden flex flex-col h-full">
-                <div className="relative mb-4 flex-shrink-0">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search conversations..."
-                    value={conversationSearch}
+              <div className="md:col-span-1 border-r overflow-auto flex flex-col min-h-0">
+                <div className="p-4 flex-shrink-0">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search conversations..."
+                      value={conversationSearch}
                     onChange={(e) => setConversationSearch(e.target.value)}
                     className="pl-9 bg-muted/50"
                   />
+                  </div>
                 </div>
-                <div className="space-y-1 overflow-y-auto flex-1">
+                <div className="p-4 space-y-1 flex-1">
                   {filteredConversations.map((conversation) => (
                     <div
                       key={conversation.id}
@@ -381,11 +384,11 @@ function MessagesContent() {
               </div>
 
               {/* Messages Area */}
-              <div className="md:col-span-2 flex flex-col min-h-0">
+              <div className="md:col-span-2 flex flex-col min-h-0 h-full max-h-full overflow-hidden">
                 {activeConv ? (
-                  <div className="flex flex-col h-full p-4">
+                  <>
                     {/* Chat Header */}
-                    <div className="flex items-center gap-3 pb-4 border-b mb-4 flex-shrink-0">
+                    <div className="flex items-center gap-3 p-4 pb-4 border-b">
                       <Avatar className="h-10 w-10">
                         <AvatarFallback className={activeConv.avatarColor}>
                           {activeConv.avatar}
@@ -412,21 +415,21 @@ function MessagesContent() {
                       </div>
                     </div>
 
-                    {/* Messages */}
-                    <div className="flex-1 overflow-y-auto pr-2 min-h-0">
-                      <div className="space-y-4">
-                        {messages.map((msg) => (
-                          <div
-                            key={msg.id}
-                            className={`flex gap-3 ${msg.isMe ? "justify-end" : ""} group`}
-                          >
-                            {!msg.isMe && (
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback className={msg.avatarColor}>
-                                  {msg.avatar}
-                                </AvatarFallback>
-                              </Avatar>
-                            )}
+                    {/* Messages - Scrollable area */}
+                    <div className="flex-1 overflow-auto p-4 min-h-0 bg-muted/10">
+                      <div className="space-y-4 max-w-3xl mx-auto w-full">
+                      {messages.map((msg) => (
+                        <div
+                          key={msg.id}
+                          className={`flex gap-3 ${msg.isMe ? "justify-end" : ""} group`}
+                        >
+                          {!msg.isMe && (
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className={msg.avatarColor}>
+                                {msg.avatar}
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
                             <div
                               className={`flex flex-col gap-1 max-w-[70%] relative ${
                                 msg.isMe ? "items-end" : ""
@@ -541,8 +544,8 @@ function MessagesContent() {
                           </div>
                         ))}
 
-                        {isTyping && (
-                          <div className="flex gap-3 justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
+                      {isTyping && (
+                        <div className="flex gap-3 justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
                             <Avatar className="h-8 w-8 animate-in zoom-in duration-300">
                               <AvatarFallback className="bg-blue-500">
                                 {typingEntry?.name
@@ -578,7 +581,7 @@ function MessagesContent() {
                     </div>
 
                     {/* Message Input */}
-                    <div className="flex gap-2 pt-4 border-t flex-shrink-0">
+                    <div className="flex gap-2 p-4 border-t flex-shrink-0">
                       <Input
                         placeholder="Type a message..."
                         value={newMessage}
@@ -607,15 +610,15 @@ function MessagesContent() {
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>
-                  </div>
+                  </>
                 ) : (
-                  <div className="flex flex-col h-full relative p-4">
-                    <div className="flex-1 flex items-center justify-center text-muted-foreground min-h-0">
+                  <>
+                    <div className="flex-1 flex items-center justify-center text-muted-foreground p-4">
                       <p>Select a conversation to start messaging</p>
                     </div>
 
                     {/* Message Input Bar - Always visible at bottom */}
-                    <div className="flex gap-2 pt-4 border-t flex-shrink-0">
+                    <div className="flex gap-2 p-4 border-t flex-shrink-0">
                       <Input
                         placeholder="Type a message..."
                         className="flex-1"
@@ -625,7 +628,7 @@ function MessagesContent() {
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>
-                  </div>
+                  </>
                 )}
               </div>
             </div>
