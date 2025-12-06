@@ -1,45 +1,47 @@
 import { NextResponse } from "next/server";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
+import prisma from "@/lib/prisma";
 
 export async function GET() {
-  // TODO: Replace with actual database query
-  // This should fetch all therapists who are accepting new patients
-  const dummyTherapists = [
-    {
-      id: "therapist-1",
-      name: "Dr. Sarah Johnson",
-      email: "sarah.johnson@bloom.com",
-      image: null,
-      role: "THERAPIST",
-    },
-    {
-      id: "therapist-2",
-      name: "Dr. Michael Chen",
-      email: "michael.chen@bloom.com",
-      image: null,
-      role: "THERAPIST",
-    },
-    {
-      id: "therapist-3",
-      name: "Dr. Emily Rodriguez",
-      email: "emily.rodriguez@bloom.com",
-      image: null,
-      role: "THERAPIST",
-    },
-    {
-      id: "therapist-4",
-      name: "Dr. James Williams",
-      email: "james.williams@bloom.com",
-      image: null,
-      role: "THERAPIST",
-    },
-    {
-      id: "therapist-5",
-      name: "Dr. Lisa Martinez",
-      email: "lisa.martinez@bloom.com",
-      image: null,
-      role: "THERAPIST",
-    },
-  ];
+  try {
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
 
-  return NextResponse.json({ therapists: dummyTherapists });
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // For now, surface all therapists except the requester.
+    const therapists = await prisma.user.findMany({
+      where: {
+        role: "THERAPIST",
+        id: { not: session.user.id },
+      },
+      select: {
+        id: true,
+        firstname: true,
+        lastname: true,
+        email: true,
+        image: true,
+        role: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+
+    const mapped = therapists.map((t) => ({
+      id: t.id,
+      name: t.firstname || t.lastname ? `${t.firstname} ${t.lastname}`.trim() : t.email,
+      email: t.email,
+      image: t.image,
+      role: t.role,
+    }));
+
+    return NextResponse.json({ therapists: mapped });
+  } catch (err) {
+    console.error("Failed to fetch available therapists", err);
+    return NextResponse.json({ error: "Failed to fetch therapists" }, { status: 500 });
+  }
 }
