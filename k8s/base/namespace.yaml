@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bloom
+  labels:
+    app.kubernetes.io/name: bloom
+    app.kubernetes.io/part-of: bloom-health

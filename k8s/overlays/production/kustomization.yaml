@@ -1,0 +1,141 @@
+# Production Environment - Full HA setup
+# Multiple replicas, autoscaling, high resources
+# Cost: ~$150-300/month (depends on traffic)
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: bloom-prod
+
+resources:
+  - ../../base
+  - redis-ha.yaml
+  - network-policies.yaml
+
+commonLabels:
+  environment: production
+
+# Production-grade patches
+patches:
+  # App: 3 replicas with higher resources
+  - target:
+      kind: Deployment
+      name: bloom-app
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "250m"
+            memory: "512Mi"
+          limits:
+            cpu: "1000m"
+            memory: "1Gi"
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: bloom-app
+
+  # Socket: 3 replicas with higher resources
+  - target:
+      kind: Deployment
+      name: bloom-socket
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 3
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "150m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+      - op: add
+        path: /spec/template/spec/topologySpreadConstraints
+        value:
+          - maxSkew: 1
+            topologyKey: topology.kubernetes.io/zone
+            whenUnsatisfiable: ScheduleAnyway
+            labelSelector:
+              matchLabels:
+                app: bloom-socket
+
+  # Update namespace
+  - target:
+      kind: Namespace
+      name: bloom
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: bloom-prod
+
+  # HPA: Higher scaling for production
+  - target:
+      group: autoscaling
+      version: v2
+      kind: HorizontalPodAutoscaler
+      name: bloom-app-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 20
+      - op: replace
+        path: /spec/metrics/0/resource/target/averageUtilization
+        value: 60
+
+  - target:
+      group: autoscaling
+      version: v2
+      kind: HorizontalPodAutoscaler
+      name: bloom-socket-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 3
+      - op: replace
+        path: /spec/maxReplicas
+        value: 15
+      - op: replace
+        path: /spec/metrics/0/resource/target/averageUtilization
+        value: 50
+
+  # PDB: Higher availability
+  - target:
+      group: policy
+      version: v1
+      kind: PodDisruptionBudget
+      name: bloom-app-pdb
+    patch: |-
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+
+  - target:
+      group: policy
+      version: v1
+      kind: PodDisruptionBudget
+      name: bloom-socket-pdb
+    patch: |-
+      - op: replace
+        path: /spec/minAvailable
+        value: 2
+
+configMapGenerator:
+  - name: bloom-config
+    behavior: merge
+    literals:
+      - NODE_ENV=production

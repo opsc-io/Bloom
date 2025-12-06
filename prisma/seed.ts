@@ -1,6 +1,7 @@
 import { PrismaClient, UserRole } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { hashPassword } from 'better-auth/crypto';
+import { faker } from '@faker-js/faker';
+import { auth } from '../src/lib/auth';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -11,66 +12,68 @@ const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
 const PASSWORD = 'Password123!';
+const THERAPIST_COUNT = 5;
+const PATIENT_COUNT = 10;
 
-// Sample data
-const therapists = [
-  { firstname: 'Sarah', lastname: 'Johnson', email: 'therapist1@example.com' },
-  { firstname: 'Michael', lastname: 'Chen', email: 'therapist2@example.com' },
-  { firstname: 'Emily', lastname: 'Rodriguez', email: 'therapist3@example.com' },
-  { firstname: 'David', lastname: 'Kim', email: 'therapist4@example.com' },
-  { firstname: 'Jessica', lastname: 'Patel', email: 'therapist5@example.com' },
-];
+type SeedUser = {
+  firstname: string;
+  lastname: string;
+  email: string;
+  bio?: string | null;
+  image?: string | null;
+};
 
-const patients = [
-  { firstname: 'James', lastname: 'Wilson', email: 'patient1@example.com' },
-  { firstname: 'Emma', lastname: 'Brown', email: 'patient2@example.com' },
-  { firstname: 'Oliver', lastname: 'Davis', email: 'patient3@example.com' },
-  { firstname: 'Sophia', lastname: 'Martinez', email: 'patient4@example.com' },
-  { firstname: 'William', lastname: 'Garcia', email: 'patient5@example.com' },
-];
+const makeUserData = (): SeedUser => {
+  const firstname = faker.person.firstName();
+  const lastname = faker.person.lastName();
+  return {
+    firstname,
+    lastname,
+    email: faker.internet.email({ firstName: firstname, lastName: lastname }).toLowerCase(),
+    bio: faker.lorem.sentence(),
+    image: faker.image.avatar()
+  };
+};
 
-async function createUser(
-  data: { firstname: string; lastname: string; email: string },
-  role: UserRole,
-  hashedPassword: string
-) {
-  const id = crypto.randomUUID();
+const therapists = Array.from({ length: THERAPIST_COUNT }, () => makeUserData());
+const patients = Array.from({ length: PATIENT_COUNT }, () => makeUserData());
+
+async function createUser(data: SeedUser, role: UserRole) {
   const name = `${data.firstname} ${data.lastname}`;
 
-  const user = await prisma.user.upsert({
-    where: { email: data.email },
-    update: {
+  let user = await prisma.user.findUnique({ where: { email: data.email } });
+  if (!user) {
+    await auth.api.signUpEmail({
+      body: {
+        email: data.email,
+        password: PASSWORD,
+        name,
+        image: data.image ?? undefined,
+        firstname: data.firstname,
+        lastname: data.lastname,
+      },
+    });
+    user = await prisma.user.findUnique({ where: { email: data.email } });
+    if (!user) {
+      throw new Error(`Failed to create user via Better Auth: ${data.email}`);
+    }
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
       firstname: data.firstname,
       lastname: data.lastname,
       name,
+      bio: data.bio ?? null,
+      image: data.image ?? null,
       role,
-      emailVerified: true,
-    },
-    create: {
-      id,
-      email: data.email,
-      firstname: data.firstname,
-      lastname: data.lastname,
-      name,
-      role,
+      therapist: role === UserRole.THERAPIST,
       emailVerified: true,
     },
   });
 
-  // Upsert credential account
-  await prisma.account.upsert({
-    where: { id: `${user.id}-credential` },
-    update: { password: hashedPassword },
-    create: {
-      id: `${user.id}-credential`,
-      userId: user.id,
-      accountId: user.id,
-      providerId: 'credential',
-      password: hashedPassword,
-    },
-  });
-
-  return user;
+  return updatedUser;
 }
 
 function daysFromNow(days: number, hour = 10, minutes = 0) {
@@ -83,14 +86,11 @@ function daysFromNow(days: number, hour = 10, minutes = 0) {
 async function seed() {
   console.log('Seeding database...');
 
-  // Hash password once (same for all test users)
-  const hashedPassword = await hashPassword(PASSWORD);
-
   // Create therapists
   console.log('Creating therapists...');
   const createdTherapists = [];
   for (const t of therapists) {
-    const user = await createUser(t, UserRole.THERAPIST, hashedPassword);
+    const user = await createUser(t, UserRole.THERAPIST);
     createdTherapists.push(user);
     console.log(`  Created therapist: ${user.email}`);
   }
@@ -99,7 +99,7 @@ async function seed() {
   console.log('Creating patients...');
   const createdPatients = [];
   for (const p of patients) {
-    const user = await createUser(p, UserRole.PATIENT, hashedPassword);
+    const user = await createUser(p, UserRole.PATIENT);
     createdPatients.push(user);
     console.log(`  Created patient: ${user.email}`);
   }
