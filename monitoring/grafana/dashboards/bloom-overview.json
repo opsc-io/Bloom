@@ -37,7 +37,7 @@
             "type": "loki",
             "uid": "loki"
           },
-          "expr": "{container=~\"bloom-app|bloom-socket\"} |= ``",
+          "expr": "{container=~\"bloom-.*\"}",
           "refId": "A"
         }
       ],

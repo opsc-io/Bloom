@@ -39,10 +39,15 @@ scrape_configs:
         target_label: instance
         replacement: 'bloom-redis'
 
-  # Docker container metrics (if cadvisor is added)
-  # - job_name: 'cadvisor'
-  #   static_configs:
-  #     - targets: ['cadvisor:8080']
+  # Docker container metrics via cAdvisor
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    metric_relabel_configs:
+      - source_labels: [container_label_com_docker_compose_service]
+        target_label: service
+      - source_labels: [name]
+        target_label: container
 
   # Application metrics (if Next.js exposes /metrics)
   # - job_name: 'bloom-app'
