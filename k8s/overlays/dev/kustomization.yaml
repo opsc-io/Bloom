@@ -1,0 +1,149 @@
+# Dev Environment - For CI/CD testing on GKE
+# Triggered on merge to dev branch
+# Single replicas, minimal resources
+# Cost: ~$25-35/month
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: bloom-dev
+
+resources:
+  - ../../base
+
+nameSuffix: ""
+
+labels:
+  - pairs:
+      environment: dev
+
+# Use Artifact Registry images
+images:
+  - name: gcr.io/PROJECT_ID/bloom-app
+    newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-app
+    newTag: dev-latest
+  - name: gcr.io/PROJECT_ID/bloom-socket
+    newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-socket
+    newTag: dev-latest
+
+# All patches in a single section
+patches:
+  # App: Single replica, minimal resources
+  - target:
+      kind: Deployment
+      name: bloom-app
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "50m"
+            memory: "128Mi"
+          limits:
+            cpu: "200m"
+            memory: "256Mi"
+
+  # Socket: Single replica, needs more memory for tsx
+  - target:
+      kind: Deployment
+      name: bloom-socket
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "50m"
+            memory: "256Mi"
+          limits:
+            cpu: "200m"
+            memory: "512Mi"
+
+  # Redis: Smaller storage
+  - target:
+      kind: StatefulSet
+      name: redis
+    patch: |-
+      - op: replace
+        path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+        value: 1Gi
+
+  # Namespace
+  - target:
+      kind: Namespace
+      name: bloom
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: bloom-dev
+
+  # ConfigMap
+  - target:
+      kind: ConfigMap
+      name: bloom-config
+    patch: |-
+      - op: replace
+        path: /data/NODE_ENV
+        value: "development"
+
+  # HPA - App
+  - target:
+      group: autoscaling
+      version: v2
+      kind: HorizontalPodAutoscaler
+      name: bloom-app-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+
+  # HPA - Socket
+  - target:
+      group: autoscaling
+      version: v2
+      kind: HorizontalPodAutoscaler
+      name: bloom-socket-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 2
+
+  # Ingress - Dev domain and static IP
+  - target:
+      kind: Ingress
+      name: bloom-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: dev.gcp.bloomhealth.us
+      - op: replace
+        path: /metadata/annotations/kubernetes.io~1ingress.global-static-ip-name
+        value: bloom-dev-ip
+      - op: replace
+        path: /metadata/annotations/networking.gke.io~1managed-certificates
+        value: bloom-dev-certificate
+
+  # ManagedCertificate - Dev domain
+  - target:
+      group: networking.gke.io
+      version: v1
+      kind: ManagedCertificate
+      name: bloom-certificate
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: bloom-dev-certificate
+      - op: replace
+        path: /spec/domains/0
+        value: dev.gcp.bloomhealth.us
