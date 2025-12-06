@@ -10,6 +10,7 @@ import { useEffect, useMemo, useState } from "react";
 import { DashboardRoleDialog } from "@/components/dashboard-role-dialog";
 import { DashboardMessagingCard } from "@/components/dashboard-messaging-card";
 import { DashboardCalendarCard } from "@/components/dashboard-calendar-card";
+import { DashboardPeopleCard } from "@/components/dashboard-people-card";
 
 type Appointment = {
   id: string;
@@ -50,10 +51,25 @@ export default function DashboardPage() {
     avatarColor: string;
   }>>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [people, setPeople] = useState<Array<{
+    id: string;
+    name: string;
+    email: string;
+    image?: string | null;
+    role?: string;
+  }>>([]);
 
   useEffect(() => {
     if (!isPending && !session?.user) {
       router.push("/sign-in");
+      return;
+    }
+    // Redirect administrators to admin dashboard
+    if (!isPending && session?.user) {
+      const isAdmin = (session.user as { administrator?: boolean }).administrator === true;
+      if (isAdmin) {
+        router.push("/admin");
+      }
     }
   }, [isPending, session, router]);
 
@@ -143,28 +159,49 @@ export default function DashboardPage() {
     };
   }, [isPending, session]);
 
+  useEffect(() => {
+    if (isPending || !session?.user) return;
+    let cancelled = false;
+
+    const loadPeople = async () => {
+      try {
+        const res = await fetch("/api/user/connections");
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        setPeople(data.people ?? []);
+      } catch {
+        // swallow errors to keep dashboard responsive
+      }
+    };
+
+    loadPeople();
+    return () => {
+      cancelled = true;
+    };
+  }, [isPending, session]);
+
   if (isPending)
     return <p className="text-center mt-8 text-white">Loading...</p>;
   if (!session?.user)
     return <p className="text-center mt-8 text-white">Redirecting...</p>;
 
   const { user } = session;
+  const userRole = (user as { role?: string }).role || "UNSET";
+
   return (
 
     <SidebarProvider>
       <AppSidebar user={user} />
       <SidebarInset>
         <DashboardHeader searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-        <div className="flex flex-1 flex-col gap-3 p-4 pt-4">
-          <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-            <DashboardMessagingCard
-              conversations={conversations}
-              messages={messages}
-            />
-            <DashboardCalendarCard appointments={appointments} />
-            <Skeleton className="bg-muted/50 aspect-video rounded-xl" />
-          </div>
-          <Skeleton className="bg-muted/50 min-h-[100vh] flex-1 rounded-xl md:min-h-min" />
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-4">
+          <DashboardPeopleCard people={people} userRole={userRole} />
+          <DashboardMessagingCard
+            conversations={conversations}
+            messages={messages}
+          />
+          <DashboardCalendarCard appointments={appointments} />
         </div>
       </SidebarInset>
       <DashboardRoleDialog

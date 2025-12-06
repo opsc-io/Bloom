@@ -1,0 +1,166 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bloom-socket
+  namespace: bloom
+  labels:
+    app: bloom-socket
+    app.kubernetes.io/name: bloom-socket
+    app.kubernetes.io/component: realtime
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: bloom-socket
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: bloom-socket
+    spec:
+      serviceAccountName: bloom-sa
+      containers:
+        - name: socket
+          image: gcr.io/PROJECT_ID/bloom-socket:latest  # Replace PROJECT_ID
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 4000
+              name: ws
+          envFrom:
+            - configMapRef:
+                name: bloom-config
+            - secretRef:
+                name: bloom-secrets
+          env:
+            - name: SOCKET_CORS_ORIGIN
+              value: "https://bloom.example.com"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 4000
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          lifecycle:
+            preStop:
+              exec:
+                # Give time for WebSocket connections to drain
+                command: ["/bin/sh", "-c", "sleep 15"]
+      # Longer grace period for WebSocket connections
+      terminationGracePeriodSeconds: 45
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: bloom-socket
+                topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: bloom-socket
+  namespace: bloom
+  annotations:
+    # GKE Backend Config for WebSocket and session affinity
+    cloud.google.com/backend-config: '{"default": "bloom-socket-backend-config"}'
+spec:
+  type: ClusterIP
+  selector:
+    app: bloom-socket
+  ports:
+    - port: 80
+      targetPort: 4000
+      name: ws
+  # Session affinity for WebSocket connections
+  sessionAffinity: ClientIP
+  sessionAffinityConfig:
+    clientIP:
+      timeoutSeconds: 3600
+---
+# GKE Backend Config for WebSocket support
+apiVersion: cloud.google.com/v1
+kind: BackendConfig
+metadata:
+  name: bloom-socket-backend-config
+  namespace: bloom
+spec:
+  timeoutSec: 86400  # 24 hours for long-lived WebSocket connections
+  connectionDraining:
+    drainingTimeoutSec: 60
+  sessionAffinity:
+    affinityType: "CLIENT_IP"
+    affinityCookieTtlSec: 3600
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: bloom-socket-hpa
+  namespace: bloom
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: bloom-socket
+  minReplicas: 2
+  maxReplicas: 8
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 70
+  behavior:
+    scaleDown:
+      # Slow scale-down to avoid dropping WebSocket connections
+      stabilizationWindowSeconds: 600
+      policies:
+        - type: Pods
+          value: 1
+          periodSeconds: 120
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 50
+          periodSeconds: 30
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: bloom-socket-pdb
+  namespace: bloom
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: bloom-socket

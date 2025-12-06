@@ -1,96 +1,244 @@
-import { faker } from "@faker-js/faker";
-import prisma from "../src/lib/prisma";
+import { PrismaClient, UserRole } from '../src/generated/prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { faker } from '@faker-js/faker';
+import { auth } from '../src/lib/auth';
+import { hashPassword } from 'better-auth/crypto';
 
-const capitalize = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
-
-async function seedUsers() {
-  const therapist = await prisma.user.upsert({
-    where: { email: "therapist@example.com" },
-    update: {},
-    create: {
-      id: faker.string.uuid(),
-      firstname: capitalize(faker.person.firstName()),
-      lastname: capitalize(faker.person.lastName()),
-      name: "Therapist Seed",
-      email: "therapist@example.com",
-      role: "THERAPIST",
-    },
-  });
-  // Git issues
-  const patients = await Promise.all(
-    Array.from({ length: 3 }, (_, idx) =>
-      prisma.user.upsert({
-        where: { email: `patient${idx + 1}@example.com` },
-        update: {},
-        create: {
-          id: faker.string.uuid(),
-          firstname: capitalize(faker.person.firstName()),
-          lastname: capitalize(faker.person.lastName()),
-          name: `Patient ${idx + 1}`,
-          email: `patient${idx + 1}@example.com`,
-          role: "PATIENT",
-        },
-      })
-    )
-  );
-
-  return { therapist, patients };
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error('DATABASE_URL environment variable is required');
 }
 
-async function seedConversations({ therapist, patients }: Awaited<ReturnType<typeof seedUsers>>) {
-  await prisma.$transaction([
-    prisma.messageReaction.deleteMany(),
-    prisma.messageAttachment.deleteMany(),
-    prisma.message.deleteMany(),
-    prisma.conversationParticipant.deleteMany(),
-    prisma.conversation.deleteMany(),
-  ]);
+const adapter = new PrismaPg({ connectionString });
+const prisma = new PrismaClient({ adapter });
 
-  const conversations = [];
+const PASSWORD = 'Password123!';
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin@bloomhealth.us';
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'Admin1234!';
+const THERAPIST_COUNT = 5;
+const PATIENT_COUNT = 10;
 
-  for (const patient of patients) {
-    const messageCount = faker.number.int({ min: 3, max: 6 });
-    const messages = Array.from({ length: messageCount }, (_, idx) => ({
-      body: faker.lorem.sentences(2),
-      sender: { connect: { id: idx % 2 === 0 ? therapist.id : patient.id } },
-      createdAt: faker.date.recent({ days: 5 }),
-    })).sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0));
+type SeedUser = {
+  firstname: string;
+  lastname: string;
+  email: string;
+  bio?: string | null;
+  image?: string | null;
+};
 
-    const convo = await prisma.conversation.create({
+const makeUserData = (): SeedUser => {
+  const firstname = faker.person.firstName();
+  const lastname = faker.person.lastName();
+  return {
+    firstname,
+    lastname,
+    email: faker.internet.email({ firstName: firstname, lastName: lastname }).toLowerCase(),
+    bio: faker.lorem.sentence(),
+    image: faker.image.avatar()
+  };
+};
+
+const therapists = Array.from({ length: THERAPIST_COUNT }, () => makeUserData());
+const patients = Array.from({ length: PATIENT_COUNT }, () => makeUserData());
+
+async function createUser(data: SeedUser, role: UserRole) {
+  const name = `${data.firstname} ${data.lastname}`;
+
+  let user = await prisma.user.findUnique({ where: { email: data.email } });
+  if (!user) {
+    await auth.api.signUpEmail({
+      body: {
+        email: data.email,
+        password: role === UserRole.ADMINISTRATOR ? ADMIN_PASSWORD : PASSWORD,
+        name,
+        image: data.image ?? undefined,
+        firstname: data.firstname,
+        lastname: data.lastname,
+      },
+    });
+    user = await prisma.user.findUnique({ where: { email: data.email } });
+    if (!user) {
+      throw new Error(`Failed to create user via Better Auth: ${data.email}`);
+    }
+  }
+
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      firstname: data.firstname,
+      lastname: data.lastname,
+      name,
+      bio: data.bio ?? null,
+      image: data.image ?? null,
+      role,
+      therapist: role === UserRole.THERAPIST,
+      administrator: role === UserRole.ADMINISTRATOR,
+      emailVerified: true,
+    },
+  });
+
+  return updatedUser;
+}
+
+function daysFromNow(days: number, hour = 10, minutes = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  d.setHours(hour, minutes, 0, 0);
+  return d;
+}
+
+async function seed() {
+  console.log('Seeding database...');
+
+  // Seed admin
+  console.log('Creating admin user...');
+  await createUser(
+    {
+      firstname: 'Admin',
+      lastname: 'User',
+      email: ADMIN_EMAIL,
+      bio: 'Administrator account',
+      image: null,
+    },
+    UserRole.ADMINISTRATOR
+  );
+  console.log(`  Admin user ready: ${ADMIN_EMAIL}`);
+
+  // Create therapists
+  console.log('Creating therapists...');
+  const createdTherapists = [];
+  for (const t of therapists) {
+    const user = await createUser(t, UserRole.THERAPIST);
+    createdTherapists.push(user);
+    console.log(`  Created therapist: ${user.email}`);
+  }
+
+  // Create patients
+  console.log('Creating patients...');
+  const createdPatients = [];
+  for (const p of patients) {
+    const user = await createUser(p, UserRole.PATIENT);
+    createdPatients.push(user);
+    console.log(`  Created patient: ${user.email}`);
+  }
+
+  // Create some appointments
+  console.log('Creating appointments...');
+  for (let i = 0; i < createdPatients.length; i++) {
+    const patient = createdPatients[i];
+    const therapist = createdTherapists[i % createdTherapists.length];
+
+    // Upcoming appointment
+    await prisma.appointment.create({
       data: {
-        lastMessageAt: messages[messages.length - 1]?.createdAt ?? new Date(),
+        therapistId: therapist.id,
+        patientId: patient.id,
+        startAt: daysFromNow(i + 1, 9, 0),
+        endAt: daysFromNow(i + 1, 9, 45),
+        status: 'SCHEDULED',
+      },
+    });
+
+    // Past completed appointment
+    await prisma.appointment.create({
+      data: {
+        therapistId: therapist.id,
+        patientId: patient.id,
+        startAt: daysFromNow(-(i + 1), 14, 0),
+        endAt: daysFromNow(-(i + 1), 14, 45),
+        status: 'COMPLETED',
+      },
+    });
+
+    console.log(`  Created appointments for ${patient.email} with ${therapist.email}`);
+  }
+
+  // Create some conversations
+  console.log('Creating conversations...');
+  for (let i = 0; i < 3; i++) {
+    const patient = createdPatients[i];
+    const therapist = createdTherapists[i];
+
+    const conversation = await prisma.conversation.create({
+      data: {
         participants: {
           create: [
-            { role: "THERAPIST", user: { connect: { id: therapist.id } } },
-            { role: "PATIENT", user: { connect: { id: patient.id } } },
+            { userId: therapist.id, role: UserRole.THERAPIST },
+            { userId: patient.id, role: UserRole.PATIENT },
           ],
-        },
-        messages: {
-          create: messages,
         },
       },
     });
 
-    conversations.push(convo);
+    // Add some messages
+    const messages = [
+      { senderId: therapist.id, body: 'Hi there! How are you feeling today?' },
+      { senderId: patient.id, body: "I'm doing better, thanks for asking." },
+      { senderId: therapist.id, body: 'Great to hear! Looking forward to our session.' },
+    ];
+
+    for (const msg of messages) {
+      await prisma.message.create({
+        data: {
+          conversationId: conversation.id,
+          senderId: msg.senderId,
+          body: msg.body,
+        },
+      });
+    }
+
+    await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { lastMessageAt: new Date() },
+    });
+
+    console.log(`  Created conversation between ${therapist.email} and ${patient.email}`);
   }
 
-  return conversations;
+  console.log('\nSeed complete!');
+  console.log('-------------------');
+  console.log('Test credentials:');
+  console.log(`  Password for all users: ${PASSWORD}`);
+  console.log('\nTherapists:');
+  createdTherapists.forEach((t) => console.log(`  - ${t.email}`));
+  console.log('\nPatients:');
+  createdPatients.forEach((p) => console.log(`  - ${p.email}`));
 }
 
-async function main() {
-  const users = await seedUsers();
-  const conversations = await seedConversations(users);
-
-  console.log("Seeded therapist:", users.therapist.email);
-  console.log("Seeded patients:", users.patients.map((p) => p.email));
-  console.log("Seeded conversations:", conversations.map((c) => c.id));
-}
-
-main()
-  .catch((error) => {
-    console.error("Seeding failed:", error);
+seed()
+  .catch((err) => {
+    console.error('Seeding failed:', err);
     process.exit(1);
   })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+  .finally(() => prisma.$disconnect());
+
+async function seedAdmin() {
+  const email = 'admin@bloomhealth.us';
+  const password = 'Admin1234!';
+
+  //create admin using better-auth
+  let admin = await prisma.user.findUnique({ where: { email } });
+  if (!admin) {
+    await auth.api.signUpEmail({
+      body: {
+        email,
+        password,
+        name: 'Admin User',
+        firstname: 'Admin',
+        lastname: 'User',
+      },
+    });
+    admin = await prisma.user.findUnique({ where: { email } });
+    if (!admin) {
+      throw new Error(`Failed to create admin user via Better Auth: ${email}`);
+    }
+  };
+
+
+
+  console.log('Admin user created:', admin.email);
+}
+
+seedAdmin()
+  .catch(console.error)
+  .finally(() => prisma.$disconnect());

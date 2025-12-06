@@ -134,7 +134,7 @@ export default function ProfilePage() {
               </BreadcrumbItem>
               <BreadcrumbSeparator className="hidden md:block" />
               <BreadcrumbItem>
-                <BreadcrumbPage>Profile Settings</BreadcrumbPage>
+                <BreadcrumbPage>Settings</BreadcrumbPage>
               </BreadcrumbItem>
             </BreadcrumbList>
           </Breadcrumb>

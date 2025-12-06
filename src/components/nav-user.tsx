@@ -36,6 +36,7 @@ export function NavUser({
   user,
 }: {
   user: {
+    id?: string
     firstname?: string | null
     lastname?: string | null
     email?: string | null
@@ -93,16 +94,16 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/profile/${user.id}`)}>
                 <Sparkles />
-                Upgrade to Pro
+                Profile
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={() => router.push("/profile")}>
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
                 <BadgeCheck />
-                Account
+                Settings
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <CreditCard />

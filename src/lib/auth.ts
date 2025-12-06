@@ -1,8 +1,10 @@
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
-import prisma from '@/lib/prisma'
+import prisma from './prisma'
 import { twoFactor } from 'better-auth/plugins'
 import { createTransport } from 'nodemailer'
+import { hashPassword, verifyPassword } from './password'
+
 
 // Async email sender that loads env vars at call time
 async function sendEmail(options: {
@@ -34,7 +36,6 @@ async function sendEmail(options: {
   })
 }
 
-
 // Handle dynamic Vercel URLs for preview deployments
 const getBaseURL = () => {
   if (process.env.BETTER_AUTH_URL) {
@@ -62,7 +63,22 @@ export const auth = betterAuth({
   ].filter(Boolean),
   emailAndPassword: {
     enabled: true,
+    disableSignUp: false,
     requireEmailVerification: true,
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
+    autoSignIn: true,
+    resetPasswordTokenExpiresIn: 3600, // 1 hour
+    password: {
+      hash: async (password) => {
+        // Custom password hashing
+        return hashPassword(password);
+      },
+      verify: async ({ hash, password }) => {
+        // Custom password verification
+        return verifyPassword(hash, password);
+      }
+    },
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({
         to: user.email,
@@ -103,6 +119,11 @@ export const auth = betterAuth({
         type: 'string',
         input: false,
         default: 'UNSET',
+      },
+      administrator: {
+        type: 'boolean',
+        input: false,
+        default: false,
       },
     },
   },

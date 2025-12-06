@@ -1,0 +1,39 @@
+# QA Ingress - Uses qa.gcp.bloomhealth.us subdomain
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bloom-ingress
+  namespace: bloom-qa
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: "bloom-qa-certificate"
+    networking.gke.io/v1beta1.FrontendConfig: "bloom-frontend-config"
+    kubernetes.io/ingress.global-static-ip-name: "bloom-qa-ip"
+spec:
+  rules:
+    - host: qa.gcp.bloomhealth.us
+      http:
+        paths:
+          - path: /socket.io/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: bloom-socket
+                port:
+                  number: 80
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: bloom-app
+                port:
+                  number: 80
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: bloom-qa-certificate
+  namespace: bloom-qa
+spec:
+  domains:
+    - qa.gcp.bloomhealth.us
