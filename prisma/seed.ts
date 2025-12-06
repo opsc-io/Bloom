@@ -16,7 +16,7 @@ async function seedUsers() {
       role: "THERAPIST",
     },
   });
-
+  // Git issues
   const patients = await Promise.all(
     Array.from({ length: 3 }, (_, idx) =>
       prisma.user.upsert({
