@@ -3,6 +3,8 @@ import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from './prisma'
 import { twoFactor } from 'better-auth/plugins'
 import { createTransport } from 'nodemailer'
+import { hashPassword, verifyPassword } from './password'
+
 
 // Async email sender that loads env vars at call time
 async function sendEmail(options: {
@@ -33,7 +35,6 @@ async function sendEmail(options: {
     ...options,
   })
 }
-
 
 // Handle dynamic Vercel URLs for preview deployments
 const getBaseURL = () => {
@@ -67,8 +68,17 @@ export const auth = betterAuth({
     minPasswordLength: 8,
     maxPasswordLength: 128,
     autoSignIn: true,
-    // Using Better Auth's default scrypt-based hashing (from better-auth/crypto)
-    // This is compatible with Vercel Edge Runtime and matches seed-admin.ts
+    resetPasswordTokenExpiresIn: 3600, // 1 hour
+    password: {
+      hash: async (password) => {
+        // Custom password hashing
+        return hashPassword(password);
+      },
+      verify: async ({ hash, password }) => {
+        // Custom password verification
+        return verifyPassword(hash, password);
+      }
+    },
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({
         to: user.email,
