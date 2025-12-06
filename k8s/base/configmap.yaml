@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bloom-config
+  namespace: bloom
+data:
+  NODE_ENV: "production"
+  SOCKET_PORT: "4000"
+  # These will be overridden by secrets for sensitive values
+  REDIS_URL: "redis://redis:6379"
+  # CockroachDB connection (use CockroachDB Cloud or in-cluster)
+  # DATABASE_URL is in secrets

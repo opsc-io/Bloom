@@ -67,9 +67,18 @@ export default function AdminPage() {
   useEffect(() => {
     const hostname = window.location.hostname;
     const isProduction = hostname === 'bloomhealth.us' || hostname === 'www.bloomhealth.us';
-    setGrafanaUrl(isProduction
-      ? 'https://opscvisuals.grafana.net/d/bloom-production/bloom-production'
-      : 'https://opscvisuals.grafana.net/d/bloom-qa/bloom-qa');
+    const isQa = hostname === 'qa.bloomhealth.us';
+
+    // Use local Grafana for localhost, Grafana Cloud for deployed environments
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      setGrafanaUrl('http://localhost:3001/d/bloom-overview/bloom-overview');
+    } else if (isProduction) {
+      setGrafanaUrl('https://opscvisuals.grafana.net/d/bloom-production/bloom-production');
+    } else if (isQa) {
+      setGrafanaUrl('https://opscvisuals.grafana.net/d/bloom-qa/bloom-qa');
+    } else {
+      setGrafanaUrl('http://localhost:3001/d/bloom-overview/bloom-overview');
+    }
   }, []);
 
   useEffect(() => {
@@ -393,8 +402,8 @@ export default function AdminPage() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-base">Grafana Analytics</CardTitle>
-                <CardDescription>Live dashboard panels from Grafana</CardDescription>
+                <CardTitle className="text-base">System Monitoring</CardTitle>
+                <CardDescription>Live metrics and logs from Grafana</CardDescription>
               </div>
               <Button variant="outline" size="sm" asChild>
                 <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
@@ -403,14 +412,47 @@ export default function AdminPage() {
                 </a>
               </Button>
             </CardHeader>
-            <CardContent className="flex flex-col items-center justify-center py-12 text-muted-foreground">
-              <BarChart3 className="h-12 w-12 mb-4 opacity-50" />
-              <p>Grafana panels will appear here once configured</p>
-              <Button variant="outline" size="sm" className="mt-4" asChild>
-                <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
-                  Configure in Grafana <ExternalLink className="ml-1 h-3 w-3" />
-                </a>
-              </Button>
+            <CardContent className="space-y-4">
+              {grafanaUrl ? (
+                <>
+                  {/* Log Volume Chart */}
+                  <div className="rounded-lg overflow-hidden border">
+                    <iframe
+                      src={`${grafanaUrl.split('/d/')[0]}/d-solo/bloom-overview/bloom-overview?orgId=1&panelId=4&theme=dark`}
+                      width="100%"
+                      height="200"
+                      frameBorder="0"
+                      title="Log Volume by Container"
+                    />
+                  </div>
+
+                  {/* Errors & Warnings Chart */}
+                  <div className="rounded-lg overflow-hidden border">
+                    <iframe
+                      src={`${grafanaUrl.split('/d/')[0]}/d-solo/bloom-overview/bloom-overview?orgId=1&panelId=5&theme=dark`}
+                      width="100%"
+                      height="200"
+                      frameBorder="0"
+                      title="Errors and Warnings"
+                    />
+                  </div>
+
+                  {/* Application Logs */}
+                  <div className="rounded-lg overflow-hidden border">
+                    <iframe
+                      src={`${grafanaUrl.split('/d/')[0]}/d-solo/bloom-overview/bloom-overview?orgId=1&panelId=1&theme=dark`}
+                      width="100%"
+                      height="250"
+                      frameBorder="0"
+                      title="Application Logs"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex h-[200px] items-center justify-center text-muted-foreground">
+                  Loading Grafana panels...
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

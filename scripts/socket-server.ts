@@ -71,7 +71,15 @@ async function userIsParticipant(userId: string, conversationId: string) {
 }
 
 async function main() {
-  const httpServer = createServer();
+  const httpServer = createServer((req, res) => {
+    // Health check endpoint
+    if (req.url === "/health") {
+      res.writeHead(200, { "Content-Type": "text/plain" });
+      res.end("ok");
+      return;
+    }
+  });
+
   const io = new Server(httpServer, {
     cors: {
       origin: SOCKET_CORS,

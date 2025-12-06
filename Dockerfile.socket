@@ -9,6 +9,9 @@ COPY package*.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
 
+# Provide dummy DATABASE_URL for prisma generate during build
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+
 # Install dependencies
 RUN npm ci
 
@@ -17,6 +20,7 @@ RUN npx prisma generate
 
 # Copy source files needed for socket server
 COPY src/lib ./src/lib
+COPY src/generated ./src/generated
 COPY scripts/socket-server.ts ./scripts/
 COPY tsconfig.json ./
 

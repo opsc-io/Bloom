@@ -1,0 +1,122 @@
+# Network Policies for Production Security
+
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: bloom-prod
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-app-ingress
+  namespace: bloom-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: bloom-app
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from Ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: gke-system
+      ports:
+        - protocol: TCP
+          port: 3000
+    # Allow from other bloom pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/part-of: bloom-health
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-socket-ingress
+  namespace: bloom-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: bloom-socket
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow from Ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: gke-system
+      ports:
+        - protocol: TCP
+          port: 4000
+    # Allow from app pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app: bloom-app
+      ports:
+        - protocol: TCP
+          port: 4000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-ingress
+  namespace: bloom-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+    - Ingress
+  ingress:
+    # Only allow from app and socket pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app: bloom-app
+        - podSelector:
+            matchLabels:
+              app: bloom-socket
+        - podSelector:
+            matchLabels:
+              app: redis
+        - podSelector:
+            matchLabels:
+              app: redis-sentinel
+      ports:
+        - protocol: TCP
+          port: 6379
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-redis-sentinel-ingress
+  namespace: bloom-prod
+spec:
+  podSelector:
+    matchLabels:
+      app: redis-sentinel
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: redis
+        - podSelector:
+            matchLabels:
+              app: redis-sentinel
+      ports:
+        - protocol: TCP
+          port: 26379

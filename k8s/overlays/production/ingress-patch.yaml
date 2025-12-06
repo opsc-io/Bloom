@@ -1,0 +1,52 @@
+# Production Ingress - Main domain with Cloud Armor
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bloom-ingress
+  namespace: bloom-prod
+  annotations:
+    kubernetes.io/ingress.class: "gce"
+    networking.gke.io/managed-certificates: "bloom-prod-certificate"
+    networking.gke.io/v1beta1.FrontendConfig: "bloom-prod-frontend-config"
+    kubernetes.io/ingress.global-static-ip-name: "bloom-prod-ip"
+spec:
+  rules:
+    - host: bloom.example.com  # Production domain
+      http:
+        paths:
+          - path: /socket.io/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: bloom-socket
+                port:
+                  number: 80
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: bloom-app
+                port:
+                  number: 80
+---
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: bloom-prod-certificate
+  namespace: bloom-prod
+spec:
+  domains:
+    - bloom.example.com
+    - www.bloom.example.com
+---
+# Frontend config with security headers
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: bloom-prod-frontend-config
+  namespace: bloom-prod
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT
+  sslPolicy: bloom-ssl-policy  # Create with gcloud

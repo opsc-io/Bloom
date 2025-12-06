@@ -1,6 +1,6 @@
 import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
-import prisma from '@/lib/prisma'
+import prisma from './prisma'
 import { twoFactor } from 'better-auth/plugins'
 import { createTransport } from 'nodemailer'
 
