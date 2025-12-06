@@ -2,6 +2,12 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { auth } from "@/lib/auth";
 import { UserRole } from "@/generated/prisma/client";
+import redis, {
+  getCachedOrFetch,
+  invalidateConversation,
+  CACHE_KEYS,
+  CACHE_TTL,
+} from "@/lib/redis";
 
 const colorPool = ["bg-blue-500", "bg-purple-500", "bg-green-500", "bg-amber-500", "bg-pink-500", "bg-indigo-500"];
 
@@ -29,19 +35,26 @@ export async function GET(req: Request) {
   const searchParams = new URL(req.url).searchParams;
   const requestedConversationId = searchParams.get("conversationId");
 
-  const conversations = await prisma.conversation.findMany({
-    where: { participants: { some: { userId } } },
-    include: {
-      participants: { include: { user: true } },
-      messages: {
-        include: { sender: true, reactions: true },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-    },
-    orderBy: [{ lastMessageAt: "desc" }, { createdAt: "desc" }],
-    take: 10,
-  });
+  // Fetch conversations with Redis caching
+  const conversations = await getCachedOrFetch(
+    CACHE_KEYS.userConversations(userId),
+    CACHE_TTL.conversations,
+    async () => {
+      return prisma.conversation.findMany({
+        where: { participants: { some: { userId } } },
+        include: {
+          participants: { include: { user: true } },
+          messages: {
+            include: { sender: true, reactions: true },
+            orderBy: { createdAt: "desc" },
+            take: 1,
+          },
+        },
+        orderBy: [{ lastMessageAt: "desc" }, { createdAt: "desc" }],
+        take: 10,
+      });
+    }
+  );
 
   const activeConversationId =
     requestedConversationId && conversations.some((c) => c.id === requestedConversationId)
@@ -80,12 +93,19 @@ export async function GET(req: Request) {
   }> = [];
 
   if (activeConversationId) {
-    const messages = await prisma.message.findMany({
-      where: { conversationId: activeConversationId },
-      include: { sender: true, reactions: true },
-      orderBy: { createdAt: "asc" },
-      take: 30,
-    });
+    // Fetch messages with Redis caching
+    const messages = await getCachedOrFetch(
+      CACHE_KEYS.conversationMessages(activeConversationId),
+      CACHE_TTL.messages,
+      async () => {
+        return prisma.message.findMany({
+          where: { conversationId: activeConversationId },
+          include: { sender: true, reactions: true },
+          orderBy: { createdAt: "asc" },
+          take: 30,
+        });
+      }
+    );
 
     mappedMessages = messages.map((msg) => {
       const reactionCounts = Object.values(
@@ -262,6 +282,16 @@ export async function POST(req: Request) {
     data: { lastMessageAt: createdMessage.createdAt },
   });
 
+  // Get participant IDs for cache invalidation
+  const participants = await prisma.conversationParticipant.findMany({
+    where: { conversationId: targetConversationId },
+    select: { userId: true },
+  });
+  const participantIds = participants.map((p) => p.userId);
+
+  // Invalidate caches for all participants
+  await invalidateConversation(targetConversationId, participantIds);
+
   const conversation = await prisma.conversation.findUnique({
     where: { id: targetConversationId },
     include: {
@@ -309,7 +339,21 @@ export async function POST(req: Request) {
     isMe: true,
     avatar: initials(session.user.firstname, session.user.lastname, session.user.email),
     avatarColor: pickColor(userId),
+    senderId: userId,
   };
+
+  // Publish message to Redis for real-time delivery via Socket.io
+  try {
+    await redis.publish(
+      `message:${targetConversationId}`,
+      JSON.stringify({
+        conversationId: targetConversationId,
+        message: mappedMessage,
+      })
+    );
+  } catch {
+    // Ignore Redis publish errors - message is already saved
+  }
 
   return NextResponse.json({
     conversation: mappedConversation,
@@ -368,6 +412,16 @@ export async function PUT(req: Request) {
       },
     });
   }
+
+  // Invalidate message cache for this conversation
+  const participants = await prisma.conversationParticipant.findMany({
+    where: { conversationId: message.conversationId },
+    select: { userId: true },
+  });
+  await invalidateConversation(
+    message.conversationId,
+    participants.map((p) => p.userId)
+  );
 
   const reactions = await prisma.messageReaction.findMany({
     where: { messageId },

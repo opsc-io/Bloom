@@ -1,19 +1,32 @@
-version: '3.8'
+version: "3.8"
+
 services:
+  # Next.js Application
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bloom-app
     ports:
       - "3000:3000"
     env_file:
       - .env.local
+    environment:
+      - DATABASE_URL=postgresql://root@db:26257/bloom?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - NEXT_PUBLIC_SOCKET_URL=http://localhost:4000
     depends_on:
       db:
         condition: service_healthy
-    environment:
-      - DATABASE_URL=postgresql://root@db:26257/bloom?sslmode=disable
+      redis:
+        condition: service_healthy
+    networks:
+      - bloom-network
 
+  # CockroachDB Database
   db:
-    image: cockroachdb/cockroach:latest
+    image: cockroachdb/cockroach:v23.2.0
+    container_name: bloom-cockroachdb
     command: start-single-node --insecure
     ports:
       - "26257:26257"
@@ -25,6 +38,52 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    networks:
+      - bloom-network
+
+  # Redis Cache
+  redis:
+    image: redis:alpine
+    container_name: bloom-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bloom-network
+
+  # Socket.io Server for real-time messaging
+  socket:
+    build:
+      context: .
+      dockerfile: Dockerfile.socket
+    container_name: bloom-socket
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env.local
+    environment:
+      - DATABASE_URL=postgresql://root@db:26257/bloom?sslmode=disable
+      - REDIS_URL=redis://redis:6379
+      - SOCKET_PORT=4000
+      - SOCKET_CORS_ORIGIN=http://localhost:3000
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bloom-network
 
 volumes:
   cockroach-data:
+  redis-data:
+
+networks:
+  bloom-network:
+    driver: bridge

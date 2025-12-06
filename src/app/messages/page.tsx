@@ -69,31 +69,6 @@ function MessagesContent() {
 
   const commonEmojis = ["👍", "❤️", "😊", "😂", "🎉", "👏"];
 
-  const handleReaction = (messageId: string, emoji: string) => {
-    setMessages((prevMessages) =>
-      prevMessages.map((msg) => {
-        if (msg.id === messageId) {
-          const reactions = msg.reactions || [];
-          const existingReaction = reactions.find((r) => r.emoji === emoji);
-          if (existingReaction) {
-            return {
-              ...msg,
-              reactions: reactions.map((r) =>
-                r.emoji === emoji ? { ...r, count: r.count + 1 } : r
-              ),
-            };
-          }
-          return {
-            ...msg,
-            reactions: [...reactions, { emoji, count: 1 }],
-          };
-        }
-        return msg;
-      })
-    );
-    setShowEmojiPicker(null);
-  };
-
   useEffect(() => {
     if (!isPending && !session?.user) {
       router.push("/sign-in");
@@ -204,6 +179,27 @@ function MessagesContent() {
         ...prev,
         [payload.conversationId]: payload,
       }));
+    });
+
+    // Listen for new messages from other users
+    socket.on("newMessage", (payload: { conversationId: string; message: Message & { senderId: string } }) => {
+      const currentUserId = (session?.user as { id?: string })?.id;
+      // Only add if it's from another user (not our own message)
+      if (payload.message.senderId !== currentUserId) {
+        setMessages((prev) => {
+          // Avoid duplicates
+          if (prev.some((m) => m.id === payload.message.id)) return prev;
+          return [...prev, { ...payload.message, isMe: false }];
+        });
+        // Update conversation list with new last message
+        setConversations((prev) =>
+          prev.map((conv) =>
+            conv.id === payload.conversationId
+              ? { ...conv, lastMessage: payload.message.message, time: payload.message.time }
+              : conv
+          )
+        );
+      }
     });
 
     const interval = setInterval(() => {
@@ -461,30 +457,23 @@ function MessagesContent() {
                                       <button
                                         key={emoji}
                                         onClick={async () => {
-                                          await fetch("/api/messages", {
-                                            method: "PUT",
-                                            headers: { "Content-Type": "application/json" },
-                                            body: JSON.stringify({ messageId: msg.id, emoji }),
-                                          }).catch(() => {});
-
-                                          setMessages((prev) =>
-                                            prev.map((m) => {
-                                              if (m.id !== msg.id) return m;
-                                              const reactions = m.reactions ?? [];
-                                              const existing = reactions.find((r) => r.emoji === emoji);
-                                              if (existing) {
-                                                const updated = reactions
-                                                  .map((r) =>
-                                                    r.emoji === emoji
-                                                      ? { ...r, count: r.count === 1 ? 0 : r.count + 1 }
-                                                      : r
-                                                  )
-                                                  .filter((r) => r.count > 0);
-                                                return { ...m, reactions: updated };
-                                              }
-                                              return { ...m, reactions: [...reactions, { emoji, count: 1 }] };
-                                            })
-                                          );
+                                          try {
+                                            const res = await fetch("/api/messages", {
+                                              method: "PUT",
+                                              headers: { "Content-Type": "application/json" },
+                                              body: JSON.stringify({ messageId: msg.id, emoji }),
+                                            });
+                                            if (res.ok) {
+                                              const data = await res.json();
+                                              setMessages((prev) =>
+                                                prev.map((m) =>
+                                                  m.id === msg.id ? { ...m, reactions: data.reactions ?? [] } : m
+                                                )
+                                              );
+                                            }
+                                          } catch {
+                                            // Ignore errors
+                                          }
                                           setShowEmojiPicker(null);
                                         }}
                                         className="hover:bg-muted rounded p-1 text-lg transition-colors"
@@ -503,25 +492,23 @@ function MessagesContent() {
                                       key={idx}
                                       className="bg-background border rounded-full px-2 py-0.5 text-xs flex items-center gap-1 cursor-pointer hover:bg-muted transition-colors"
                                       onClick={async () => {
-                                        await fetch("/api/messages", {
-                                          method: "PUT",
-                                          headers: { "Content-Type": "application/json" },
-                                          body: JSON.stringify({ messageId: msg.id, emoji: reaction.emoji }),
-                                        }).catch(() => {});
-                                        setMessages((prev) =>
-                                          prev.map((m) => {
-                                            if (m.id !== msg.id) return m;
-                                            const reactions = m.reactions ?? [];
-                                            const updated = reactions
-                                              .map((r) =>
-                                                r.emoji === reaction.emoji
-                                                  ? { ...r, count: Math.max(0, r.count - 1) }
-                                                  : r
+                                        try {
+                                          const res = await fetch("/api/messages", {
+                                            method: "PUT",
+                                            headers: { "Content-Type": "application/json" },
+                                            body: JSON.stringify({ messageId: msg.id, emoji: reaction.emoji }),
+                                          });
+                                          if (res.ok) {
+                                            const data = await res.json();
+                                            setMessages((prev) =>
+                                              prev.map((m) =>
+                                                m.id === msg.id ? { ...m, reactions: data.reactions ?? [] } : m
                                               )
-                                              .filter((r) => r.count > 0);
-                                            return { ...m, reactions: updated };
-                                          })
-                                        );
+                                            );
+                                          }
+                                        } catch {
+                                          // Ignore errors
+                                        }
                                       }}
                                     >
                                       <span>{reaction.emoji}</span>

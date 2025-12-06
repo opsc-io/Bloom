@@ -21,6 +21,20 @@ type TypingPayload = {
   expiresAt: number;
 };
 
+type MessagePayload = {
+  conversationId: string;
+  message: {
+    id: string;
+    sender: string;
+    message: string;
+    time: string;
+    isMe: boolean;
+    avatar: string;
+    avatarColor: string;
+    senderId: string;
+  };
+};
+
 async function getSessionFromSocket(socket: any) {
   const headers = new Headers();
   const cookie = socket.handshake?.headers?.cookie;
@@ -59,13 +73,20 @@ async function main() {
     },
   });
 
-  sub.psubscribe("typing:*");
+  // Subscribe to typing and message events
+  sub.psubscribe("typing:*", "message:*");
   sub.on("pmessage", (_pattern, channel, message) => {
     try {
-      const payload: TypingPayload = JSON.parse(message);
-      io.to(payload.conversationId).emit("typing", payload);
+      if (channel.startsWith("typing:")) {
+        const payload: TypingPayload = JSON.parse(message);
+        io.to(payload.conversationId).emit("typing", payload);
+      } else if (channel.startsWith("message:")) {
+        const payload: MessagePayload = JSON.parse(message);
+        io.to(payload.conversationId).emit("newMessage", payload);
+        console.log(`[Socket] Broadcasting newMessage to room ${payload.conversationId}`);
+      }
     } catch (err) {
-      console.error("Failed to parse typing message", err);
+      console.error("Failed to parse message", err);
     }
   });
 
