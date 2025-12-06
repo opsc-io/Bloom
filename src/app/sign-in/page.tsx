@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, sendVerificationEmail } from "@/lib/auth-client";
 import Image from "next/image";
@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Mail, CheckCircle } from "lucide-react";
+import { useSession } from "@/lib/auth-client";
 
 
 export default function LoginPage() {
@@ -25,6 +26,13 @@ export default function LoginPage() {
   const [unverifiedEmail, setUnverifiedEmail] = useState("");
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState(false);
+  const { data: session, isPending } = useSession();
+
+  useEffect(() => {
+    if (!isPending && session?.user) {
+      router.replace("/dashboard");
+    }
+  }, [isPending, session, router]);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -151,8 +159,11 @@ export default function LoginPage() {
     );
   }
 
-  return (
+  if (!isPending && session?.user) {
+    return <p className="text-center mt-8 text-white">Redirecting...</p>;
+  }
 
+  return (
     <div className="bg-muted flex min-h-svh flex-col items-center justify-center gap-6 p-6 md:p-10">
       <div className="flex w-full max-w-sm flex-col gap-6">
         <a href="#" className="flex items-center gap-2 self-center font-medium">
@@ -167,5 +178,5 @@ export default function LoginPage() {
 
       </div>
     </div>
-  )
+  );
 }

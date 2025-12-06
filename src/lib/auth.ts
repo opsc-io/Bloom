@@ -3,6 +3,7 @@ import { prismaAdapter } from 'better-auth/adapters/prisma'
 import prisma from '@/lib/prisma'
 import { twoFactor } from 'better-auth/plugins'
 import { createTransport } from 'nodemailer'
+import bcrypt from 'bcrypt'
 
 // Async email sender that loads env vars at call time
 async function sendEmail(options: {
@@ -62,7 +63,11 @@ export const auth = betterAuth({
   ].filter(Boolean),
   emailAndPassword: {
     enabled: true,
+    disableSignUp: false,
     requireEmailVerification: true,
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
+    autoSignIn: true,
     sendResetPassword: async ({ user, url }) => {
       await sendEmail({
         to: user.email,
@@ -86,6 +91,15 @@ export const auth = betterAuth({
           </div>
         `,
       })
+    },
+    password: {
+      hash: async (password) => {
+        // bcrypt for strong hashing; tune salt rounds for security vs. speed
+        return bcrypt.hash(password, 12)
+      },
+      verify: async ({ hash, password }) => {
+        return bcrypt.compare(password, hash)
+      },
     },
   },
   user: {

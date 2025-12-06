@@ -123,21 +123,23 @@ export async function POST(req: Request) {
 
   const userId = session.user.id;
   const body = await req.json();
-  const { conversationId, recipientId, message } = body as {
+  const { conversationId, recipientId, message, startOnly } = body as {
     conversationId?: string;
     recipientId?: string;
     message?: string;
+    startOnly?: boolean;
   };
 
-  if (!message || !message.trim()) {
+  const messageText = typeof message === "string" ? message.trim() : "";
+  const initiateOnly = Boolean(startOnly);
+
+  if (!initiateOnly && !messageText) {
     return NextResponse.json({ error: "Message is required" }, { status: 400 });
   }
 
   if (!conversationId && !recipientId) {
     return NextResponse.json({ error: "conversationId or recipientId is required" }, { status: 400 });
   }
-
-  const text = message.trim();
 
   let targetConversationId = conversationId;
 
@@ -187,6 +189,7 @@ export async function POST(req: Request) {
 
       const newConversation = await prisma.conversation.create({
         data: {
+          lastMessageAt: new Date(),
           participants: {
             create: [
               { userId, role: UserRole[normalizeRole(myRole)] },
@@ -203,11 +206,53 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unable to resolve conversation" }, { status: 400 });
   }
 
+  // If we just want to ensure a conversation exists, update freshness and return it
+  if (initiateOnly) {
+    await prisma.conversation.update({
+      where: { id: targetConversationId },
+      data: { lastMessageAt: new Date() },
+    });
+
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: targetConversationId },
+      include: {
+        participants: { include: { user: true } },
+        messages: { include: { sender: true }, orderBy: { createdAt: "desc" }, take: 1 },
+      },
+    });
+
+    if (!conversation) {
+      return NextResponse.json({ error: "Conversation not found after creating" }, { status: 404 });
+    }
+
+    const otherParticipant =
+      conversation.participants.find((p) => p.userId !== userId)?.user ?? conversation.participants[0]?.user;
+    const name =
+      otherParticipant?.firstname || otherParticipant?.lastname
+        ? `${otherParticipant?.firstname ?? ""} ${otherParticipant?.lastname ?? ""}`.trim()
+        : otherParticipant?.email ?? "Conversation";
+    const avatarInitials = initials(otherParticipant?.firstname, otherParticipant?.lastname, otherParticipant?.email);
+    const lastMsg = conversation.messages[0];
+
+    const mappedConversation = {
+      id: conversation.id,
+      name,
+      avatar: avatarInitials,
+      avatarColor: pickColor(conversation.id),
+      lastMessage: lastMsg?.body ?? "",
+      time: lastMsg ? formatTime(new Date(lastMsg.createdAt)) : "",
+      unread: 0,
+      active: true,
+    };
+
+    return NextResponse.json({ conversation: mappedConversation });
+  }
+
   const createdMessage = await prisma.message.create({
     data: {
       conversationId: targetConversationId,
       senderId: userId,
-      body: text,
+      body: messageText,
     },
   });
 
@@ -259,7 +304,7 @@ export async function POST(req: Request) {
       session.user.firstname || session.user.lastname
         ? `${session.user.firstname ?? ""} ${session.user.lastname ?? ""}`.trim()
         : session.user.email,
-    message: text,
+    message: messageText,
     time: formatTime(new Date(createdMessage.createdAt)),
     isMe: true,
     avatar: initials(session.user.firstname, session.user.lastname, session.user.email),

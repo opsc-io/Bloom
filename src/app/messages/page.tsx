@@ -52,7 +52,9 @@ type Message = {
 function MessagesContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const messageUserId = searchParams.get("message");
+  const conversationParam = searchParams.get("conversationId");
+  const recipientParam = conversationParam ? null : searchParams.get("message");
+  const requestedConversationId = conversationParam ?? recipientParam;
   const { data: session, isPending } = useSession();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -117,11 +119,11 @@ function MessagesContent() {
         if (activeConversation && !convIds.includes(activeConversation)) {
           setActiveConversation(data.conversations?.[0]?.id ?? null);
         } else if (!activeConversation) {
-          if (messageUserId && convIds.includes(messageUserId)) {
-            setActiveConversation(messageUserId);
-          } else if (messageUserId) {
+          if (requestedConversationId && convIds.includes(requestedConversationId)) {
+            setActiveConversation(requestedConversationId);
+          } else if (requestedConversationId) {
             // allow starting a new conversation with a user id from the query param
-            setActiveConversation(messageUserId);
+            setActiveConversation(requestedConversationId);
           } else if (data.conversations?.length > 0) {
             setActiveConversation(data.conversations[0].id);
           }
@@ -141,7 +143,44 @@ function MessagesContent() {
     return () => {
       cancelled = true;
     };
-  }, [isPending, session, messageUserId, activeConversation]);
+  }, [isPending, session, requestedConversationId, activeConversation]);
+
+  // If user is deep-linked with a user id (not an existing conversation), create the conversation first
+  useEffect(() => {
+    if (isPending || !session?.user || !recipientParam) return;
+    const alreadyExists = conversations.some((c) => c.id === recipientParam);
+    if (alreadyExists) return;
+
+    let cancelled = false;
+    const ensureConversation = async () => {
+      try {
+        const res = await fetch("/api/messages", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ recipientId: recipientParam, startOnly: true }),
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const convoId = data.conversation?.id;
+        if (!convoId || cancelled) return;
+        setActiveConversation(convoId);
+
+        const refresh = await fetch(`/api/messages?conversationId=${convoId}`);
+        if (!refresh.ok) return;
+        const refreshed = await refresh.json();
+        if (cancelled) return;
+        setConversations(refreshed.conversations ?? []);
+        setMessages(refreshed.messages ?? []);
+      } catch {
+        // keep page usable even if ensureConversation fails
+      }
+    };
+
+    ensureConversation();
+    return () => {
+      cancelled = true;
+    };
+  }, [isPending, session, recipientParam, conversations]);
 
   // Join active conversation room for typing updates when it changes
   useEffect(() => {

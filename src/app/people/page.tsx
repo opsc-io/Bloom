@@ -41,6 +41,7 @@ export default function PeoplePage() {
   const [availableTherapists, setAvailableTherapists] = useState<Person[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [therapistSearchQuery, setTherapistSearchQuery] = useState("");
+  const [messageLoadingId, setMessageLoadingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -119,6 +120,33 @@ export default function PeoplePage() {
     ? "Manage and communicate with your patients"
     : "View and contact your assigned therapist";
   const Icon = isTherapist ? Users : User;
+
+  const handleMessageClick = async (personId: string) => {
+    setMessageLoadingId(personId);
+    try {
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipientId: personId, startOnly: true }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const convoId = data.conversation?.id;
+        if (convoId) {
+          router.push(`/messages?conversationId=${convoId}`);
+          return;
+        }
+      }
+
+      // Fallback to prior behavior if the API call fails
+      router.push(`/messages?message=${personId}`);
+    } catch {
+      router.push(`/messages?message=${personId}`);
+    } finally {
+      setMessageLoadingId(null);
+    }
+  };
 
   return (
     <SidebarProvider>
@@ -223,10 +251,11 @@ export default function PeoplePage() {
                                   variant="default"
                                   size="sm"
                                   className="flex-1"
-                                  onClick={() => router.push(`/messages?message=${person.id}`)}
+                                  onClick={() => handleMessageClick(person.id)}
+                                  disabled={messageLoadingId === person.id}
                                 >
                                   <MessageCircle className="h-4 w-4 mr-2" />
-                                  Message
+                                  {messageLoadingId === person.id ? "Opening..." : "Message"}
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -303,10 +332,11 @@ export default function PeoplePage() {
                                   variant="default"
                                   size="sm"
                                   className="flex-1"
-                                  onClick={() => router.push(`/messages?message=${therapist.id}`)}
+                                  onClick={() => handleMessageClick(therapist.id)}
+                                  disabled={messageLoadingId === therapist.id}
                                 >
                                   <MessageCircle className="h-4 w-4 mr-2" />
-                                  Message
+                                  {messageLoadingId === therapist.id ? "Opening..." : "Message"}
                                 </Button>
                                 <Button
                                   variant="outline"
@@ -388,10 +418,11 @@ export default function PeoplePage() {
                                 variant="default"
                                 size="sm"
                                 className="flex-1"
-                                onClick={() => router.push(`/messages?message=${person.id}`)}
+                                onClick={() => handleMessageClick(person.id)}
+                                disabled={messageLoadingId === person.id}
                               >
                                 <MessageCircle className="h-4 w-4 mr-2" />
-                                Message
+                                {messageLoadingId === person.id ? "Opening..." : "Message"}
                               </Button>
                               <Button
                                 variant="outline"

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { signIn, signUp, sendVerificationEmail } from "@/lib/auth-client";
@@ -14,14 +14,24 @@ import {
 } from "@/components/ui/card";
 import { SignupForm } from "@/components/signup-form"
 import { Mail, CheckCircle } from "lucide-react";
+import { useSession } from "@/lib/auth-client";
+import { useRouter } from "next/navigation";
 
 export default function SignUpPage() {
+    const router = useRouter();
     const [error, setError] = useState<string | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [signupSuccess, setSignupSuccess] = useState(false);
     const [userEmail, setUserEmail] = useState("");
     const [isResending, setIsResending] = useState(false);
     const [resendSuccess, setResendSuccess] = useState(false);
+    const { data: session, isPending } = useSession();
+
+    useEffect(() => {
+        if (!isPending && session?.user) {
+            router.replace("/dashboard");
+        }
+    }, [isPending, session, router]);
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
@@ -87,6 +97,10 @@ export default function SignUpPage() {
         } finally {
             setIsResending(false);
         }
+    }
+
+    if (!isPending && session?.user) {
+        return <p className="text-center mt-8 text-white">Redirecting...</p>;
     }
 
     // Show success message after signup
