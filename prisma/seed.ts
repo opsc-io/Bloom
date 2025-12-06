@@ -2,6 +2,7 @@ import { PrismaClient, UserRole } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { faker } from '@faker-js/faker';
 import { auth } from '../src/lib/auth';
+import { hashPassword } from 'better-auth/crypto';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -12,6 +13,8 @@ const adapter = new PrismaPg({ connectionString });
 const prisma = new PrismaClient({ adapter });
 
 const PASSWORD = 'Password123!';
+const ADMIN_EMAIL = process.env.SEED_ADMIN_EMAIL || 'admin@bloomhealth.us';
+const ADMIN_PASSWORD = process.env.SEED_ADMIN_PASSWORD || 'Admin1234!';
 const THERAPIST_COUNT = 5;
 const PATIENT_COUNT = 10;
 
@@ -46,7 +49,7 @@ async function createUser(data: SeedUser, role: UserRole) {
     await auth.api.signUpEmail({
       body: {
         email: data.email,
-        password: PASSWORD,
+        password: role === UserRole.ADMINISTRATOR ? ADMIN_PASSWORD : PASSWORD,
         name,
         image: data.image ?? undefined,
         firstname: data.firstname,
@@ -69,6 +72,7 @@ async function createUser(data: SeedUser, role: UserRole) {
       image: data.image ?? null,
       role,
       therapist: role === UserRole.THERAPIST,
+      administrator: role === UserRole.ADMINISTRATOR,
       emailVerified: true,
     },
   });
@@ -85,6 +89,20 @@ function daysFromNow(days: number, hour = 10, minutes = 0) {
 
 async function seed() {
   console.log('Seeding database...');
+
+  // Seed admin
+  console.log('Creating admin user...');
+  await createUser(
+    {
+      firstname: 'Admin',
+      lastname: 'User',
+      email: ADMIN_EMAIL,
+      bio: 'Administrator account',
+      image: null,
+    },
+    UserRole.ADMINISTRATOR
+  );
+  console.log(`  Admin user ready: ${ADMIN_EMAIL}`);
 
   // Create therapists
   console.log('Creating therapists...');
@@ -192,4 +210,49 @@ seed()
     console.error('Seeding failed:', err);
     process.exit(1);
   })
+  .finally(() => prisma.$disconnect());
+
+async function seedAdmin() {
+  const email = 'admin@bloomhealth.us';
+  const password = 'Admin1234!';
+  const hashedPassword = await hashPassword(password);
+  const id = crypto.randomUUID();
+
+  // Upsert admin user
+  const admin = await prisma.user.upsert({
+    where: { email },
+    update: {
+      role: UserRole.ADMINISTRATOR,
+      administrator: true,
+    },
+    create: {
+      id,
+      email,
+      firstname: 'Admin',
+      lastname: 'User',
+      name: 'Admin User',
+      role: UserRole.ADMINISTRATOR,
+      administrator: true,
+      emailVerified: true,
+    },
+  });
+
+  // Upsert credential account with password
+  await prisma.account.upsert({
+    where: { id: `${admin.id}-credential` },
+    update: { password: hashedPassword },
+    create: {
+      id: `${admin.id}-credential`,
+      userId: admin.id,
+      accountId: admin.id,
+      providerId: 'credential',
+      password: hashedPassword,
+    },
+  });
+
+  console.log('Admin user created:', admin.email);
+}
+
+seedAdmin()
+  .catch(console.error)
   .finally(() => prisma.$disconnect());

@@ -4,6 +4,16 @@
   <h1>Bloom — Therapy Practice Platform</h1>
 </div>
 
+## Frameworks used
+
+- Next.js (App Router, TypeScript)
+- Prisma (CockroachDB)
+- Better Auth (Prisma adapter, OAuth, 2FA)
+- shadcn/ui (Tailwind + Radix)
+- Socket.io (messaging transport)
+- Redis (messaging cache/invalidations)
+- Vercel Blob (file uploads)
+
 ## Overview
 
 Bloom helps therapists set up and operate a practice from onboarding to billing and patient care. It combines credentialing automation, telehealth, payments, a lightweight EHR, and realtime messaging in two delivery modes: self-hosted and cloud multi-tenant.
@@ -21,6 +31,19 @@ Create an open-source platform inspired by Alma and Headway, offering:
 - HIPAA-aware realtime messaging with moderation, audit trails, and optional ML assistance.
 - Extensible integrations: Zoom/Google Meet for telehealth, Stripe for payments, Optum for claims.
 .
+## Current features
+
+- Email/password auth with Better Auth + Prisma; OAuth scaffolding (Google/Zoom); role selection; profile/password settings; optional 2FA
+- Test-mode hash override and bcrypt-based hashing for seeded users
+- Dashboard with people, messaging, and calendar cards
+- Messaging API with Redis caching, reactions, and socket publish; messages page UI
+- Appointment CRUD APIs with role-aware access; calendar UI (week offsets)
+- Therapist↔patient assignment model and API (current/past therapist relationships)
+- Admin stats and Grafana proxy endpoints with admin dashboard UI
+- File upload API via Vercel Blob
+- People discovery endpoints and pages (available therapists, connections)
+- Seed scripts for admin + Faker users, appointments, conversations, and assignments
+
 ## High-level epics & features
 
 ## 1. Setup: Next.js + Prisma + Better Auth + shadcn/ui
@@ -69,14 +92,14 @@ Overall goal: Enable passkeys (WebAuthn) and TOTP for strong, auditable multi-fa
 
 ### 2.1. Core Messaging MVP (Phase 1)
 
-- [ ] Create `feature/messaging/realtime-init` branch.
-- [ ] Add entities: `src/db/entities/Thread.ts`, `Message.ts`, `MessageAudit.ts`.
+- [x] Implement conversation/message endpoints backed by Prisma
+- [x] Add deterministic user-facing mapping for conversations and last messages
 - [ ] Add deterministic moderation helper in `src/lib/moderation.ts` for test-mode.
 - [ ] Add Vitest integration test (sqlite) for moderation → blurred + audit.
 
 ### 2.2. WebSocket Transport (Phase 2)
 
-- [ ] Configure a socket.io server (or alternative, see tech stack suggestions).
+- [x] Configure a socket.io server and publish new messages/reactions
 - [ ] Implement socket connection handshake and authentication (using NextAuth.js JWT).
 - [ ] Implement `message:send` event from client, triggering moderation and DB save.
 - [ ] Implement `message:receive` event pushed from server to all thread participants.
@@ -84,7 +107,7 @@ Overall goal: Enable passkeys (WebAuthn) and TOTP for strong, auditable multi-fa
 ### 2.3. Messaging Features
 
 - [ ] Implement file uploads (API to generate presigned URLs for MinIO).
-- [ ] Add DB schema and socket events for emoji reactions.
+- [x] Add DB schema and socket events for emoji reactions.
 - [ ] Implement `user:typing` start/stop socket events.
 - [ ] Implement presence system (using Redis or socket state) for away/available/offline.
 
@@ -114,10 +137,12 @@ Overall goal: Enable passkeys (WebAuthn) and TOTP for strong, auditable multi-fa
 
 ### 4.1. Core Scheduling
 
-- [ ] Define DB schema for `Appointment`, `Availability` (therapist's schedule), and `SessionNote`.
-- [ ] Create UI (e.g., using react-big-calendar) for therapists to set their availability.
+- [x] Define DB schema for `Appointment`
+- [ ] Define DB schema for `Availability` (therapist's schedule) and `SessionNote`.
+- [x] Create UI for patients/therapists to view appointments (calendar/dashboard)
+- [ ] Create UI for therapists to set their availability.
 - [ ] Create UI for patients to browse availability and book appointments.
-- [ ] Build CRUD API endpoints for managing appointments.
+- [x] Build CRUD API endpoints for managing appointments.
 
 ### 4.2. Telehealth Integration (Phase 3)
 
@@ -136,7 +161,7 @@ Overall goal: Enable passkeys (WebAuthn) and TOTP for strong, auditable multi-fa
 ### 5.1. Secure Storage
 
 - [ ] Configure MinIO/S3 bucket policies for HIPAA compliance (private objects, encryption at rest).
-- [ ] Implement API endpoints to generate short-lived presigned URLs for secure uploads and downloads.
+- [x] Implement API endpoints to generate short-lived upload URLs (Vercel Blob) and store metadata.
 - [ ] Create UI for managing session notes and patient-uploaded documents.
 
 ### 5.2. EHR Schema
@@ -167,7 +192,7 @@ Overall goal: Enable passkeys (WebAuthn) and TOTP for strong, auditable multi-fa
 
 ### 7.1. Ticketing System
 
-- [ ] Define DB schema for `SupportTicket` and `TicketMessage`.
+- [x] Define DB schema for `SupportTicket` and related ticket attachments
 - [ ] Create UI for patients and therapists to submit support tickets.
 - [ ] Build the admin UI to view, assign, and manage ticket priority and status.
 
