@@ -6,8 +6,8 @@ on:
 
 env:
   PROJECT_ID: project-4fc52960-1177-49ec-a6f
-  GKE_CLUSTER: bloom-qa-cluster
-  GKE_ZONE: us-central1
+  GKE_CLUSTER: bloom-dev-cluster
+  GKE_ZONE: us-central1-a
   REGISTRY: us-central1-docker.pkg.dev
   REPOSITORY: bloom-images
 
