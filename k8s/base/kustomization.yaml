@@ -8,9 +8,12 @@ resources:
   - configmap.yaml
   # Note: secrets are created manually via kubectl for security
   # - secrets.yaml
+  - cockroachdb-statefulset.yaml
+  - redis-statefulset.yaml
+  - db-init-job.yaml
   - app-deployment.yaml
   - socket-deployment.yaml
-  - redis-statefulset.yaml
+  - monitoring-stack.yaml
   - ingress.yaml
 
 commonLabels:

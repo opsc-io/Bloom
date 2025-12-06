@@ -25,6 +25,9 @@ images:
   - name: gcr.io/PROJECT_ID/bloom-socket
     newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-socket
     newTag: dev-latest
+  - name: gcr.io/PROJECT_ID/bloom-db-init
+    newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-db-init
+    newTag: dev-latest
 
 # All patches in a single section
 patches:
