@@ -34,7 +34,6 @@ model User {
   messageReactions         MessageReaction[]
 
   role UserRole @default(UNSET)
-  name String
 
   paymentMethods    PaymentMethod[]
   payments          Payment[]
@@ -64,6 +63,8 @@ model User {
 
   therapist     Boolean?
   administrator Boolean?
+
+  name String
 
   @@unique([email])
   @@map("user")
