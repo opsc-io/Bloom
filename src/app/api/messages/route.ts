@@ -74,6 +74,7 @@ export async function GET(req: Request) {
       name,
       avatar: avatarInitials,
       avatarColor: pickColor(conv.id),
+      image: otherParticipant?.image ?? null,
       lastMessage: lastMsg?.body ?? "",
       time: lastMsg ? formatTime(new Date(lastMsg.createdAt)) : "",
       unread: 0,
@@ -126,6 +127,7 @@ export async function GET(req: Request) {
         isMe: msg.senderId === userId,
         avatar: initials(msg.sender.firstname, msg.sender.lastname, msg.sender.email),
         avatarColor: pickColor(msg.senderId),
+        image: msg.sender.image ?? null,
         reactions: reactionCounts,
       };
     });
@@ -259,6 +261,7 @@ export async function POST(req: Request) {
       name,
       avatar: avatarInitials,
       avatarColor: pickColor(conversation.id),
+      image: otherParticipant?.image ?? null,
       lastMessage: lastMsg?.body ?? "",
       time: lastMsg ? formatTime(new Date(lastMsg.createdAt)) : "",
       unread: 0,
@@ -322,6 +325,7 @@ export async function POST(req: Request) {
     name,
     avatar: avatarInitials,
     avatarColor: pickColor(conversation.id),
+    image: otherParticipant?.image ?? null,
     lastMessage: lastMsg?.body ?? "",
     time: lastMsg ? formatTime(new Date(lastMsg.createdAt)) : "",
     unread: 0,
@@ -339,6 +343,7 @@ export async function POST(req: Request) {
     isMe: true,
     avatar: initials(session.user.firstname, session.user.lastname, session.user.email),
     avatarColor: pickColor(userId),
+    image: session.user.image ?? null,
     senderId: userId,
   };
 
