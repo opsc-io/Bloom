@@ -30,9 +30,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        env:
+          DATABASE_URL: "postgresql://root@localhost:26257/bloom?sslmode=disable"
 
       - name: Generate Prisma client
         run: npx prisma generate
+        env:
+          DATABASE_URL: "postgresql://root@localhost:26257/bloom?sslmode=disable"
 
       - name: Type check
         run: npx tsc --noEmit
