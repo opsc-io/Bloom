@@ -44,7 +44,7 @@ export function DashboardMessagingCard({ conversations, messages }: DashboardMes
     <Card
       className={`transition-all duration-300 ${isExpanded
         ? 'fixed inset-0 z-50 rounded-none border-0 md:col-span-1'
-        : 'md:col-span-1 aspect-video cursor-pointer hover:shadow-lg'
+        : 'md:col-span-1 h-full cursor-pointer hover:shadow-lg'
         }`}
       onClick={() => !isExpanded && handleExpand()}
     >
