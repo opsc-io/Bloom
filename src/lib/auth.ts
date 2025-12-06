@@ -104,6 +104,11 @@ export const auth = betterAuth({
         input: false,
         default: 'UNSET',
       },
+      administrator: {
+        type: 'boolean',
+        input: false,
+        default: false,
+      },
     },
   },
   socialProviders: {
