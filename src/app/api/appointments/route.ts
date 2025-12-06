@@ -17,10 +17,14 @@ export async function GET(req: Request) {
   const userId = session.user.id;
   const isTherapist = session.user.role === "THERAPIST";
 
+  // Support weekOffset parameter for viewing different weeks
+  const url = new URL(req.url);
+  const weekOffset = parseInt(url.searchParams.get("weekOffset") ?? "0", 10) || 0;
+
   const now = new Date();
   const startOfWeek = new Date(now);
   startOfWeek.setHours(0, 0, 0, 0);
-  startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7)); // Monday
+  startOfWeek.setDate(startOfWeek.getDate() - ((startOfWeek.getDay() + 6) % 7) + weekOffset * 7); // Monday + offset
   const endOfWeek = new Date(startOfWeek);
   endOfWeek.setDate(endOfWeek.getDate() + 7);
 

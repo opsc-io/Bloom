@@ -9,6 +9,7 @@
     "lint": "eslint",
     "postinstall": "npx prisma generate",
     "seed": "prisma db seed",
+    "seed:admin": "tsx prisma/seed-admin.ts",
     "socket": "tsx scripts/socket-server.ts"
   },
   "prisma": {

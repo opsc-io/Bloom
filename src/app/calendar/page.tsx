@@ -16,7 +16,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Clock, Edit3, XCircle } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, Edit3, XCircle } from "lucide-react";
 
 import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
@@ -91,7 +91,7 @@ export default function CalendarPage() {
 
     const loadAppointments = async () => {
       try {
-        const res = await fetch("/api/appointments");
+        const res = await fetch(`/api/appointments?weekOffset=${weekOffset}`);
         if (!res.ok) return;
         const data = await res.json() as { appointments?: Appointment[] };
         if (cancelled) return;
@@ -111,7 +111,7 @@ export default function CalendarPage() {
     return () => {
       cancelled = true;
     };
-  }, [isPending, session]);
+  }, [isPending, session, weekOffset]);
 
   useEffect(() => {
     if (isPending || !session?.user) return;
@@ -182,8 +182,8 @@ export default function CalendarPage() {
         throw new Error(body.error || "Failed to create appointment");
       }
 
-      // refresh appointments
-      const refresh = await fetch("/api/appointments");
+      // refresh appointments for current week view
+      const refresh = await fetch(`/api/appointments?weekOffset=${weekOffset}`);
       if (refresh.ok) {
         const data = (await refresh.json()) as { appointments?: Appointment[] };
         setAppointments(
@@ -243,7 +243,7 @@ export default function CalendarPage() {
         throw new Error(body.error || "Failed to update appointment");
       }
 
-      const refresh = await fetch("/api/appointments");
+      const refresh = await fetch(`/api/appointments?weekOffset=${weekOffset}`);
       if (refresh.ok) {
         const data = (await refresh.json()) as { appointments?: Appointment[] };
         setAppointments(
@@ -277,7 +277,7 @@ export default function CalendarPage() {
         throw new Error(body.error || "Failed to cancel appointment");
       }
 
-      const refresh = await fetch("/api/appointments");
+      const refresh = await fetch(`/api/appointments?weekOffset=${weekOffset}`);
       if (refresh.ok) {
         const data = (await refresh.json()) as { appointments?: Appointment[] };
         setAppointments(
