@@ -202,6 +202,15 @@ function MessagesContent() {
       }
     });
 
+    // Listen for reaction updates
+    socket.on("reactionUpdate", (payload: { conversationId: string; messageId: string; reactions: { emoji: string; count: number }[] }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === payload.messageId ? { ...msg, reactions: payload.reactions } : msg
+        )
+      );
+    });
+
     const interval = setInterval(() => {
       const now = Date.now();
       setTypingMap((prev) => {

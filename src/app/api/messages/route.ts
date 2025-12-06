@@ -435,5 +435,19 @@ export async function PUT(req: Request) {
     }, {})
   );
 
+  // Publish reaction update to Redis for real-time delivery via Socket.io
+  try {
+    await redis.publish(
+      `reaction:${message.conversationId}`,
+      JSON.stringify({
+        conversationId: message.conversationId,
+        messageId,
+        reactions: aggregated,
+      })
+    );
+  } catch {
+    // Ignore Redis publish errors
+  }
+
   return NextResponse.json({ reactions: aggregated });
 }
