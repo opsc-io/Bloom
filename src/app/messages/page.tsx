@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Search, Send, MessageSquarePlus, Smile } from "lucide-react";
+import { Search, Send, MessageSquarePlus, Smile, BarChart3 } from "lucide-react";
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
@@ -416,9 +416,9 @@ function MessagesContent() {
                     </div>
 
                     {/* Messages - Scrollable area */}
-                    <div className="flex-1 overflow-auto p-4 min-h-0 bg-muted/10">
+                    <div className="flex-1 overflow-y-auto overflow-x-visible p-4 min-h-0 bg-muted/10 relative">
                       <div className="space-y-4 max-w-3xl mx-auto w-full">
-                      {messages.map((msg) => (
+                      {messages.map((msg, idx) => (
                         <div
                           key={msg.id}
                           className={`flex gap-3 ${msg.isMe ? "justify-end" : ""} group`}
@@ -430,119 +430,139 @@ function MessagesContent() {
                               </AvatarFallback>
                             </Avatar>
                           )}
-                            <div
-                              className={`flex flex-col gap-1 max-w-[70%] relative ${
-                                msg.isMe ? "items-end" : ""
-                              }`}
-                            >
-                              <div className="relative">
-                                <div
-                                  className={`rounded-lg px-4 py-2 ${
-                                    msg.isMe
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-muted"
-                                  }`}
-                                >
-                                  <p className="text-sm">{msg.message}</p>
-                                </div>
-
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  className={`absolute -bottom-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-background border shadow-sm ${
-                                    msg.isMe ? "right-0" : "left-0"
-                                  }`}
-                                  onClick={() =>
-                                    setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)
-                                  }
-                                >
-                                  <Smile className="h-3 w-3" />
-                                </Button>
-
-                                {showEmojiPicker === msg.id && (
-                                  <div
-                                    className={`absolute bottom-8 bg-background border rounded-lg shadow-lg p-2 flex gap-1 z-10 ${
-                                      msg.isMe ? "right-0" : "left-0"
-                                    }`}
-                                  >
-                                    {commonEmojis.map((emoji) => (
-                                      <button
-                                        key={emoji}
-                                        onClick={async () => {
-                                          try {
-                                            const res = await fetch("/api/messages", {
-                                              method: "PUT",
-                                              headers: { "Content-Type": "application/json" },
-                                              body: JSON.stringify({ messageId: msg.id, emoji }),
-                                            });
-                                            if (res.ok) {
-                                              const data = await res.json();
-                                              setMessages((prev) =>
-                                                prev.map((m) =>
-                                                  m.id === msg.id ? { ...m, reactions: data.reactions ?? [] } : m
-                                                )
-                                              );
-                                            }
-                                          } catch {
-                                            // Ignore errors
-                                          }
-                                          setShowEmojiPicker(null);
-                                        }}
-                                        className="hover:bg-muted rounded p-1 text-lg transition-colors"
-                                      >
-                                        {emoji}
-                                      </button>
-                                    ))}
-                                  </div>
-                                )}
+                          <div className={`flex flex-col gap-1 max-w-[70%] relative ${msg.isMe ? "items-end" : ""}`}>
+                            <div className="relative flex items-center gap-2">
+                              <div
+                                className={`rounded-lg px-4 py-2 ${
+                                  msg.isMe ? "bg-primary text-primary-foreground" : "bg-muted"
+                                }`}
+                              >
+                                <p className="text-sm">{msg.message}</p>
                               </div>
 
-                              {msg.reactions && msg.reactions.length > 0 && (
-                                <div className="flex gap-1 flex-wrap">
-                                  {msg.reactions.map((reaction, idx) => (
-                                    <div
-                                      key={idx}
-                                      className="bg-background border rounded-full px-2 py-0.5 text-xs flex items-center gap-1 cursor-pointer hover:bg-muted transition-colors"
+                              {!msg.isMe && (
+                                <div className="relative group/insight">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-7 w-7 p-0 border bg-background/80 hover:bg-background"
+                                    aria-label="Patient insights"
+                                  >
+                                    <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+                                  </Button>
+                                  <div className="pointer-events-none absolute left-full top-0 ml-2 hidden w-56 rounded-lg border bg-card p-3 shadow-lg group-hover/insight:block z-30">
+                                    <p className="text-xs font-semibold mb-1">Patient snapshot</p>
+                                    <div className="text-xs text-muted-foreground space-y-1">
+                                      <p className="flex items-center gap-2">
+                                        <span className="h-2.5 w-2.5 rounded-full bg-green-500"></span>
+                                        Mood trend: steady ↑
+                                      </p>
+                                      <p className="flex items-center gap-2">
+                                        <span className="h-2.5 w-2.5 rounded-full bg-green-400"></span>
+                                        Sleep: improving (6.8h avg)
+                                      </p>
+                                      <p className="flex items-center gap-2">
+                                        <span className="h-2.5 w-2.5 rounded-full bg-yellow-400"></span>
+                                        Check-ins this week: 3
+                                      </p>
+                                      <p className="flex items-center gap-2">
+                                        <span className="h-2.5 w-2.5 rounded-full bg-red-400"></span>
+                                        Next step: reinforce evening routine
+                                      </p>
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className={`absolute -bottom-2 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity bg-background border shadow-sm ${
+                                  msg.isMe ? "right-0" : "left-0"
+                                }`}
+                                onClick={() => setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)}
+                              >
+                                <Smile className="h-3 w-3" />
+                              </Button>
+
+                              {showEmojiPicker === msg.id && (
+                                <div
+                                  className={`absolute ${
+                                    idx === 0 ? "top-full mt-2" : "bottom-8"
+                                  } bg-background border rounded-lg shadow-lg p-2 flex gap-1 z-10 ${
+                                    msg.isMe ? "right-0" : "left-0"
+                                  }`}
+                                >
+                                  {commonEmojis.map((emoji) => (
+                                    <button
+                                      key={emoji}
                                       onClick={async () => {
                                         try {
                                           const res = await fetch("/api/messages", {
                                             method: "PUT",
                                             headers: { "Content-Type": "application/json" },
-                                            body: JSON.stringify({ messageId: msg.id, emoji: reaction.emoji }),
+                                            body: JSON.stringify({ messageId: msg.id, emoji }),
                                           });
                                           if (res.ok) {
                                             const data = await res.json();
                                             setMessages((prev) =>
-                                              prev.map((m) =>
-                                                m.id === msg.id ? { ...m, reactions: data.reactions ?? [] } : m
-                                              )
+                                              prev.map((m) => (m.id === msg.id ? { ...m, reactions: data.reactions ?? [] } : m))
                                             );
                                           }
                                         } catch {
                                           // Ignore errors
                                         }
+                                        setShowEmojiPicker(null);
                                       }}
+                                      className="hover:bg-muted rounded p-1 text-lg transition-colors"
                                     >
-                                      <span>{reaction.emoji}</span>
-                                      <span className="text-muted-foreground">{reaction.count}</span>
-                                    </div>
+                                      {emoji}
+                                    </button>
                                   ))}
                                 </div>
                               )}
-
-                              <span className="text-xs text-muted-foreground">
-                                {msg.time}
-                              </span>
                             </div>
-                            {msg.isMe && (
-                              <Avatar className="h-8 w-8">
-                                <AvatarFallback className={msg.avatarColor}>
-                                  {msg.avatar}
-                                </AvatarFallback>
-                              </Avatar>
+
+                            {msg.reactions && msg.reactions.length > 0 && (
+                              <div className="flex gap-1 flex-wrap">
+                                {msg.reactions.map((reaction, idx) => (
+                                  <div
+                                    key={idx}
+                                    className="bg-background border rounded-full px-2 py-0.5 text-xs flex items-center gap-1 cursor-pointer hover:bg-muted transition-colors"
+                                    onClick={async () => {
+                                      try {
+                                        const res = await fetch("/api/messages", {
+                                          method: "PUT",
+                                          headers: { "Content-Type": "application/json" },
+                                          body: JSON.stringify({ messageId: msg.id, emoji: reaction.emoji }),
+                                        });
+                                        if (res.ok) {
+                                          const data = await res.json();
+                                          setMessages((prev) =>
+                                            prev.map((m) => (m.id === msg.id ? { ...m, reactions: data.reactions ?? [] } : m))
+                                          );
+                                        }
+                                      } catch {
+                                        // Ignore errors
+                                      }
+                                    }}
+                                  >
+                                    <span>{reaction.emoji}</span>
+                                    <span className="text-muted-foreground">{reaction.count}</span>
+                                  </div>
+                                ))}
+                              </div>
                             )}
+
+                            <span className="text-xs text-muted-foreground">{msg.time}</span>
                           </div>
-                        ))}
+                          {msg.isMe && (
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className={msg.avatarColor}>{msg.avatar}</AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
+                      ))}
 
                       {isTyping && (
                         <div className="flex gap-3 justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
