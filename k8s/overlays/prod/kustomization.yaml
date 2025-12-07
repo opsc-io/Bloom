@@ -149,3 +149,14 @@ patches:
       - op: replace
         path: /spec/domains/0
         value: bloomhealth.us
+
+  # Promtail ClusterRoleBinding - Production namespace
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: ClusterRoleBinding
+      name: promtail
+    patch: |-
+      - op: add
+        path: /subjects/0/namespace
+        value: bloom-prod

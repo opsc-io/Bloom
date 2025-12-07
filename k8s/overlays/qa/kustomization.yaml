@@ -149,3 +149,14 @@ patches:
       - op: replace
         path: /spec/domains/0
         value: qa.gcp.bloomhealth.us
+
+  # Promtail ClusterRoleBinding - QA namespace
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: ClusterRoleBinding
+      name: promtail
+    patch: |-
+      - op: add
+        path: /subjects/0/namespace
+        value: bloom-qa

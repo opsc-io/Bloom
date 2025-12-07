@@ -267,13 +267,13 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sql_service_latency_p99 / 1e6",
+          "expr": "histogram_quantile(0.99, sum(rate(exec_latency_bucket[5m])) by (le)) / 1e9",
           "legendFormat": "p99 Latency",
           "refId": "A"
         },
         {
           "datasource": { "type": "prometheus", "uid": "prometheus" },
-          "expr": "sql_service_latency_p50 / 1e6",
+          "expr": "histogram_quantile(0.50, sum(rate(exec_latency_bucket[5m])) by (le)) / 1e9",
           "legendFormat": "p50 Latency",
           "refId": "B"
         }
