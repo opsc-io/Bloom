@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Search, Send, MessageSquarePlus, Smile, BarChart3 } from "lucide-react";
 
 import { useRouter, useSearchParams } from "next/navigation";
@@ -32,6 +32,7 @@ type Conversation = {
   name: string;
   avatar: string;
   avatarColor: string;
+  image?: string | null;
   lastMessage: string;
   time: string;
   unread: number;
@@ -46,6 +47,7 @@ type Message = {
   isMe: boolean;
   avatar: string;
   avatarColor: string;
+  image?: string | null;
   reactions?: { emoji: string; count: number }[];
 };
 
@@ -284,15 +286,24 @@ function MessagesContent() {
 
   const activeConv = conversations.find((c) => c.id === activeConversation);
   const typingEntry = activeConversation ? typingMap[activeConversation] : undefined;
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  // Update current time periodically for typing indicator expiry check
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const isTyping =
     typingEntry &&
     typingEntry.userId !== (session?.user as { id?: string })?.id &&
-    typingEntry.expiresAt > Date.now();
+    typingEntry.expiresAt > currentTime;
 
   if (isPending) return <p className="text-center mt-8 text-white">Loading...</p>;
   if (!session?.user) return <p className="text-center mt-8 text-white">Redirecting...</p>;
 
   const { user } = session;
+  const userRole = (user as { role?: string }).role || "UNSET";
 
   return (
     <SidebarProvider>
@@ -356,6 +367,7 @@ function MessagesContent() {
                       }`}
                     >
                       <Avatar className="h-10 w-10">
+                        {conversation.image && <AvatarImage src={conversation.image} alt={conversation.name} />}
                         <AvatarFallback className={conversation.avatarColor}>
                           {conversation.avatar}
                         </AvatarFallback>
@@ -390,6 +402,7 @@ function MessagesContent() {
                     {/* Chat Header */}
                     <div className="flex items-center gap-3 p-4 pb-4 border-b">
                       <Avatar className="h-10 w-10">
+                        {activeConv.image && <AvatarImage src={activeConv.image} alt={activeConv.name} />}
                         <AvatarFallback className={activeConv.avatarColor}>
                           {activeConv.avatar}
                         </AvatarFallback>
@@ -425,6 +438,7 @@ function MessagesContent() {
                         >
                           {!msg.isMe && (
                             <Avatar className="h-8 w-8">
+                              {msg.image && <AvatarImage src={msg.image} alt={msg.sender} />}
                               <AvatarFallback className={msg.avatarColor}>
                                 {msg.avatar}
                               </AvatarFallback>
@@ -440,7 +454,7 @@ function MessagesContent() {
                                 <p className="text-sm">{msg.message}</p>
                               </div>
 
-                              {!msg.isMe && (
+                              {!msg.isMe && userRole === "practitioner" && (
                                 <div className="relative group/insight">
                                   <Button
                                     size="icon"
@@ -558,6 +572,7 @@ function MessagesContent() {
                           </div>
                           {msg.isMe && (
                             <Avatar className="h-8 w-8">
+                              {msg.image && <AvatarImage src={msg.image} alt={msg.sender} />}
                               <AvatarFallback className={msg.avatarColor}>{msg.avatar}</AvatarFallback>
                             </Avatar>
                           )}

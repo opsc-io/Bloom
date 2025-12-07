@@ -73,6 +73,7 @@ spec:
         name: cockroachdb-data
       spec:
         accessModes: ["ReadWriteOnce"]
+        storageClassName: standard  # Use HDD instead of SSD
         resources:
           requests:
             storage: 10Gi

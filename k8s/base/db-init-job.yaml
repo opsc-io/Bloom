@@ -25,9 +25,11 @@ spec:
             - sh
             - -c
             - |
-              echo "Creating database if not exists..."
-              npx prisma db push --skip-generate
-              echo "Database initialized successfully"
+              echo "Initializing database schema..."
+              npx prisma db push --accept-data-loss
+              echo "Running full seed..."
+              npm run seed:full
+              echo "Database initialized and seeded successfully"
           resources:
             requests:
               cpu: "50m"

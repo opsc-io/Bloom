@@ -1,0 +1,151 @@
+# Production Environment
+# Single replicas for now (minimal setup)
+# Domain: bloomhealth.us
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: bloom-prod
+
+resources:
+  - ../../base
+
+nameSuffix: ""
+
+labels:
+  - pairs:
+      environment: production
+
+# Use Artifact Registry images
+images:
+  - name: gcr.io/PROJECT_ID/bloom-app
+    newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-app
+    newTag: prod-latest
+  - name: gcr.io/PROJECT_ID/bloom-socket
+    newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-socket
+    newTag: prod-latest
+  - name: gcr.io/PROJECT_ID/bloom-db-init
+    newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-db-init
+    newTag: prod-latest
+
+# All patches in a single section
+patches:
+  # App: Single replica, minimal resources (for now)
+  - target:
+      kind: Deployment
+      name: bloom-app
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+  # Socket: Single replica
+  - target:
+      kind: Deployment
+      name: bloom-socket
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "100m"
+            memory: "256Mi"
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+
+  # Redis: Smaller storage
+  - target:
+      kind: StatefulSet
+      name: redis
+    patch: |-
+      - op: replace
+        path: /spec/volumeClaimTemplates/0/spec/resources/requests/storage
+        value: 1Gi
+
+  # Namespace
+  - target:
+      kind: Namespace
+      name: bloom
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: bloom-prod
+
+  # ConfigMap - Production settings
+  - target:
+      kind: ConfigMap
+      name: bloom-config
+    patch: |-
+      - op: replace
+        path: /data/NODE_ENV
+        value: "production"
+
+  # HPA - App
+  - target:
+      group: autoscaling
+      version: v2
+      kind: HorizontalPodAutoscaler
+      name: bloom-app-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
+  # HPA - Socket
+  - target:
+      group: autoscaling
+      version: v2
+      kind: HorizontalPodAutoscaler
+      name: bloom-socket-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 3
+
+  # Ingress - Production domain and static IP
+  - target:
+      kind: Ingress
+      name: bloom-ingress
+    patch: |-
+      - op: replace
+        path: /spec/rules/0/host
+        value: bloomhealth.us
+      - op: replace
+        path: /metadata/annotations/kubernetes.io~1ingress.global-static-ip-name
+        value: bloom-prod-ip
+      - op: replace
+        path: /metadata/annotations/networking.gke.io~1managed-certificates
+        value: bloom-prod-certificate
+
+  # ManagedCertificate - Production domain
+  - target:
+      group: networking.gke.io
+      version: v1
+      kind: ManagedCertificate
+      name: bloom-certificate
+    patch: |-
+      - op: replace
+        path: /metadata/name
+        value: bloom-prod-certificate
+      - op: replace
+        path: /spec/domains/0
+        value: bloomhealth.us

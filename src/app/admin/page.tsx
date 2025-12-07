@@ -1,6 +1,7 @@
 "use client";
 
 import { AppSidebar } from "@/components/app-sidebar"
+import { NavUser } from "@/components/nav-user"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -10,6 +11,13 @@ import {
 } from "@/components/ui/breadcrumb"
 import { Separator } from "@/components/ui/separator"
 import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
   SidebarInset,
   SidebarProvider,
   SidebarTrigger,
@@ -20,6 +28,7 @@ import { Badge } from "@/components/ui/badge"
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "@/lib/auth-client";
 import { useEffect, useState, Suspense } from "react";
+import Image from "next/image"
 import {
   Users,
   Stethoscope,
@@ -70,7 +79,7 @@ type AdminStats = {
   userGrowth: Array<{ date: string; users: number }>;
 };
 
-const COLORS = ["#60a5fa", "#f472b6"];
+const COLORS = ["#60a5fa", "#4CBB17", "#f472b6"];
 
 type TabType = "overview" | "database" | "containers" | "redis" | "logs";
 
@@ -101,7 +110,8 @@ function AdminContent() {
   useEffect(() => {
     const hostname = window.location.hostname;
     const isProduction = hostname === 'bloomhealth.us' || hostname === 'www.bloomhealth.us';
-    const isQa = hostname === 'qa.bloomhealth.us';
+    const isQa = hostname === 'qa.bloomhealth.us' || hostname === 'qa.gcp.bloomhealth.us';
+    const isDev = hostname === 'dev.gcp.bloomhealth.us';
 
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
       setGrafanaUrl('http://localhost:3001/d/bloom-overview/bloom-overview');
@@ -109,8 +119,11 @@ function AdminContent() {
       setGrafanaUrl('https://opscvisuals.grafana.net/d/bloom-production/bloom-production');
     } else if (isQa) {
       setGrafanaUrl('https://opscvisuals.grafana.net/d/bloom-qa/bloom-qa');
+    } else if (isDev) {
+      setGrafanaUrl('https://opscvisuals.grafana.net/d/bloom-dev/bloom-dev');
     } else {
-      setGrafanaUrl('http://localhost:3001/d/bloom-overview/bloom-overview');
+      // Default to Grafana Cloud for unknown GKE hostnames
+      setGrafanaUrl('https://opscvisuals.grafana.net/d/bloom-overview/bloom-overview');
     }
   }, []);
 
@@ -189,6 +202,7 @@ function AdminContent() {
 
   const pieData = stats ? [
     { name: "Patients", value: stats.overview.patientCount },
+    { name: "Therapists", value: stats.overview.therapistCount },
     { name: "Admins", value: stats.overview.adminCount },
   ] : [];
 
@@ -216,9 +230,65 @@ function AdminContent() {
 
   return (
     <SidebarProvider>
-      <AppSidebar user={user} />
+      {/* Custom Admin Sidebar */}
+      <Sidebar>
+        <SidebarHeader>
+          <SidebarMenu>
+            <SidebarMenuItem>
+              <SidebarMenuButton size="lg" asChild>
+                <a href="/dashboard">
+                  <div className="flex items-center justify-center">
+                    <Image src="/logo.svg" alt="Bloom Logo" width={100} height={33} className="h-6 w-auto" />
+                  </div>
+                  <div className="flex flex-col gap-0.5 leading-none">
+                    <span className="font-semibold">Admin Panel</span>
+                    <span className="text-xs text-muted-foreground">System Management</span>
+                  </div>
+                </a>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarHeader>
+        <SidebarContent>
+          <nav className="space-y-1 p-2">
+            {tabs.map((tab) => {
+              const Icon = tab.icon;
+              return (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={cn(
+                    "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                    activeTab === tab.id
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {tab.label}
+                </button>
+              );
+            })}
+          </nav>
+          {/* Quick Links */}
+          <div className="mt-auto p-4 border-t">
+            <p className="text-xs font-medium text-muted-foreground mb-3">Quick Links</p>
+            <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
+              <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
+                <BarChart3 className="mr-2 h-4 w-4" />
+                Grafana
+                <ExternalLink className="ml-auto h-3 w-3" />
+              </a>
+            </Button>
+          </div>
+        </SidebarContent>
+        <SidebarFooter>
+          <NavUser user={user} />
+        </SidebarFooter>
+      </Sidebar>
+      
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 data-[orientation=vertical]:h-4" />
@@ -244,45 +314,8 @@ function AdminContent() {
           </div>
         </header>
 
-        <div className="flex flex-1">
-          {/* Left Sidebar Navigation */}
-          <aside className="w-56 border-r bg-muted/30 p-4">
-            <nav className="space-y-1">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={cn(
-                      "flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                      activeTab === tab.id
-                        ? "bg-primary text-primary-foreground"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
-                    {tab.label}
-                  </button>
-                );
-              })}
-            </nav>
-
-            {/* Quick Links */}
-            <div className="mt-8 pt-4 border-t">
-              <p className="text-xs font-medium text-muted-foreground mb-3 px-3">Quick Links</p>
-              <Button variant="ghost" size="sm" className="w-full justify-start" asChild>
-                <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Grafana
-                  <ExternalLink className="ml-auto h-3 w-3" />
-                </a>
-              </Button>
-            </div>
-          </aside>
-
-          {/* Main Content Area */}
-          <main className="flex-1 overflow-auto p-4">
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-auto p-4">
             {/* Overview Tab */}
             {activeTab === "overview" && (
               <div className="space-y-4">
@@ -402,7 +435,7 @@ function AdminContent() {
                         <CardDescription>Breakdown by role</CardDescription>
                       </div>
                     </CardHeader>
-                    <CardContent className="h-[200px]">
+                    <CardContent className="h-[250px]">
                       {statsLoading ? (
                         <div className="flex h-full items-center justify-center text-muted-foreground">
                           Loading...
@@ -413,7 +446,7 @@ function AdminContent() {
                             <Pie
                               data={pieData}
                               cx="50%"
-                              cy="50%"
+                              cy="45%"
                               innerRadius={50}
                               outerRadius={70}
                               paddingAngle={2}
@@ -425,7 +458,7 @@ function AdminContent() {
                                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                             </Pie>
-                            <Legend />
+                            <Legend verticalAlign="bottom" height={36} />
                             <Tooltip />
                           </PieChart>
                         </ResponsiveContainer>
@@ -883,7 +916,6 @@ function AdminContent() {
               </div>
             )}
           </main>
-        </div>
       </SidebarInset>
     </SidebarProvider>
   );

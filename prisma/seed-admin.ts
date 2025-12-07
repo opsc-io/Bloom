@@ -1,6 +1,6 @@
 import { PrismaClient, UserRole } from '../src/generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
-import { hashPassword } from 'better-auth/crypto';
+import { hashPassword } from '../src/lib/password';
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {

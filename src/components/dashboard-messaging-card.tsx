@@ -4,13 +4,14 @@ import { Search, Maximize2, Minimize2, MessageSquare, Send } from "lucide-react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
-import { Avatar, AvatarFallback } from "@/components/ui/avatar"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 type Conversation = {
   id: string
   name: string
   avatar: string
   avatarColor: string
+  image?: string | null
   lastMessage: string
   time: string
   unread: number
@@ -25,6 +26,7 @@ type Message = {
   isMe: boolean
   avatar: string
   avatarColor: string
+  image?: string | null
 }
 
 type DashboardMessagingCardProps = {
@@ -73,6 +75,7 @@ export function DashboardMessagingCard({ conversations, messages }: DashboardMes
                     }}
                   >
                     <Avatar className="h-12 w-12 cursor-pointer hover:scale-110 transition-transform">
+                      {conv.image && <AvatarImage src={conv.image} alt={conv.name} />}
                       <AvatarFallback className={`${conv.avatarColor} text-white font-semibold`}>
                         {conv.avatar}
                       </AvatarFallback>
@@ -121,6 +124,7 @@ export function DashboardMessagingCard({ conversations, messages }: DashboardMes
                       }`}
                   >
                     <Avatar className="h-12 w-12 shrink-0">
+                      {conv.image && <AvatarImage src={conv.image} alt={conv.name} />}
                       <AvatarFallback className={`${conv.avatarColor} text-white font-semibold`}>
                         {conv.avatar}
                       </AvatarFallback>
@@ -154,6 +158,9 @@ export function DashboardMessagingCard({ conversations, messages }: DashboardMes
               {conversations.find(c => c.active) ? (
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
+                    {conversations.find(c => c.active)?.image && (
+                      <AvatarImage src={conversations.find(c => c.active)?.image ?? ''} alt={conversations.find(c => c.active)?.name} />
+                    )}
                     <AvatarFallback className={`${conversations.find(c => c.active)?.avatarColor} text-white font-semibold`}>
                       {conversations.find(c => c.active)?.avatar}
                     </AvatarFallback>
@@ -177,6 +184,7 @@ export function DashboardMessagingCard({ conversations, messages }: DashboardMes
                   >
                     {!msg.isMe && (
                       <Avatar className="h-8 w-8 shrink-0">
+                        {msg.image && <AvatarImage src={msg.image} alt={msg.sender} />}
                         <AvatarFallback className={`${msg.avatarColor} text-white text-xs font-semibold`}>
                           {msg.avatar}
                         </AvatarFallback>
@@ -191,6 +199,7 @@ export function DashboardMessagingCard({ conversations, messages }: DashboardMes
                     </div>
                     {msg.isMe && (
                       <Avatar className="h-8 w-8 shrink-0">
+                        {msg.image && <AvatarImage src={msg.image} alt={msg.sender} />}
                         <AvatarFallback className={`${msg.avatarColor} text-white text-xs font-semibold`}>
                           {msg.avatar}
                         </AvatarFallback>

@@ -90,6 +90,34 @@ jobs:
           cluster_name: ${{ env.GKE_CLUSTER }}
           location: ${{ env.GKE_ZONE }}
 
+      - name: Fetch secrets from GCP Secret Manager
+        run: |
+          echo "Fetching secrets from GCP Secret Manager..."
+          BETTER_AUTH_SECRET=$(gcloud secrets versions access latest --secret=better-auth-secret)
+          GOOGLE_CLIENT_ID=$(gcloud secrets versions access latest --secret=google-client-id)
+          GOOGLE_CLIENT_SECRET=$(gcloud secrets versions access latest --secret=google-client-secret)
+          ZOOM_CLIENT_ID=$(gcloud secrets versions access latest --secret=zoom-client-id)
+          ZOOM_CLIENT_SECRET=$(gcloud secrets versions access latest --secret=zoom-client-secret)
+          ZOOM_SECRET_TOKEN=$(gcloud secrets versions access latest --secret=zoom-secret-token)
+          SMTP_USER=$(gcloud secrets versions access latest --secret=smtp-user)
+          SMTP_PASSWORD=$(gcloud secrets versions access latest --secret=smtp-password)
+
+          # Create/update Kubernetes secret
+          kubectl create secret generic bloom-secrets \
+            --namespace=bloom-dev \
+            --from-literal=DATABASE_URL="postgresql://root@cockroachdb:26257/bloom?sslmode=disable" \
+            --from-literal=BETTER_AUTH_SECRET="$BETTER_AUTH_SECRET" \
+            --from-literal=BETTER_AUTH_URL="https://dev.gcp.bloomhealth.us" \
+            --from-literal=NEXT_PUBLIC_SOCKET_URL="https://dev.gcp.bloomhealth.us" \
+            --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
+            --from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
+            --from-literal=ZOOM_CLIENT_ID="$ZOOM_CLIENT_ID" \
+            --from-literal=ZOOM_CLIENT_SECRET="$ZOOM_CLIENT_SECRET" \
+            --from-literal=ZOOM_SECRET_TOKEN="$ZOOM_SECRET_TOKEN" \
+            --from-literal=SMTP_USER="$SMTP_USER" \
+            --from-literal=SMTP_PASSWORD="$SMTP_PASSWORD" \
+            --dry-run=client -o yaml | kubectl apply -f -
+
       - name: Install Kustomize
         run: |
           curl -s "https://raw.githubusercontent.com/kubernetes-sigs/kustomize/master/hack/install_kustomize.sh" | bash

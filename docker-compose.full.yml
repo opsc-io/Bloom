@@ -28,6 +28,11 @@ services:
       - SMTP_PORT=${SMTP_PORT:-587}
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - ZOOM_CLIENT_ID=${ZOOM_CLIENT_ID:-}
+      - ZOOM_CLIENT_SECRET=${ZOOM_CLIENT_SECRET:-}
+      - ZOOM_SECRET_TOKEN=${ZOOM_SECRET_TOKEN:-}
     depends_on:
       db-init:
         condition: service_completed_successfully

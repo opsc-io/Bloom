@@ -10,6 +10,10 @@ RUN apk add --no-cache openssl
 COPY package*.json ./
 COPY prisma ./prisma
 COPY prisma.config.ts ./
+COPY tsconfig.json ./
+
+# Copy source files needed for seed (password hashing)
+COPY src/lib/password.ts ./src/lib/
 
 # Install dependencies with a dummy DATABASE_URL for prisma generate
 ENV DATABASE_URL=postgresql://dummy:dummy@localhost:5432/dummy

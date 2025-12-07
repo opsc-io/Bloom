@@ -1,9 +1,14 @@
 import "dotenv/config";
 import { createServer } from "http";
-import { Server } from "socket.io";
+import { Server, Socket } from "socket.io";
 import Redis from "ioredis";
 import prisma from "../src/lib/prisma";
 import { auth } from "../src/lib/auth";
+
+interface AuthenticatedSocket extends Socket {
+  userId: string;
+  userName?: string;
+}
 
 const SOCKET_PORT = Number(process.env.SOCKET_PORT || 4000);
 const SOCKET_CORS = process.env.SOCKET_CORS_ORIGIN
@@ -41,11 +46,11 @@ type ReactionPayload = {
   reactions: { emoji: string; count: number }[];
 };
 
-async function getSessionFromSocket(socket: any) {
+async function getSessionFromSocket(socket: Socket) {
   const headers = new Headers();
   const cookie = socket.handshake?.headers?.cookie;
   if (cookie) headers.set("cookie", cookie);
-  const bearer = socket.handshake?.auth?.token;
+  const bearer = (socket.handshake?.auth as { token?: string })?.token;
   if (bearer) headers.set("authorization", `Bearer ${bearer}`);
   try {
     return await auth.api.getSession({ headers });
@@ -113,14 +118,15 @@ async function main() {
     if (!session?.user?.id) {
       return next(new Error("unauthorized"));
     }
-    (socket as any).userId = session.user.id;
-    (socket as any).userName = session.user.name ?? undefined;
+    (socket as AuthenticatedSocket).userId = session.user.id;
+    (socket as AuthenticatedSocket).userName = session.user.name ?? undefined;
     next();
   });
 
   io.on("connection", async (socket) => {
-    const userId: string = (socket as any).userId;
-    const name: string | undefined = (socket as any).userName;
+    const authSocket = socket as AuthenticatedSocket;
+    const userId: string = authSocket.userId;
+    const name: string | undefined = authSocket.userName;
 
     try {
       const convIds = await userConversationIds(userId);

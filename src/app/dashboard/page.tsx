@@ -36,6 +36,7 @@ export default function DashboardPage() {
     name: string;
     avatar: string;
     avatarColor: string;
+    image?: string | null;
     lastMessage: string;
     time: string;
     unread: number;
@@ -49,6 +50,7 @@ export default function DashboardPage() {
     isMe: boolean;
     avatar: string;
     avatarColor: string;
+    image?: string | null;
   }>>([]);
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [people, setPeople] = useState<Array<{
