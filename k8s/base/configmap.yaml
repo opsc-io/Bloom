@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: bloom-config
+  namespace: bloom
+data:
+  NODE_ENV: "production"
+  SOCKET_PORT: "4000"
+  # Self-hosted services (in-cluster)
+  REDIS_URL: "redis://redis:6379"
+  DATABASE_URL: "postgresql://root@cockroachdb:26257/bloom?sslmode=disable"
+  # Monitoring
+  GRAFANA_URL: "http://grafana:3000"
+  PROMETHEUS_URL: "http://prometheus:9090"
+  LOKI_URL: "http://loki:3100"

@@ -1,0 +1,56 @@
+# Prometheus configuration for Bloom self-hosted stack
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'bloom-monitor'
+
+# Alerting configuration (optional)
+alerting:
+  alertmanagers: []
+
+# Rule files (optional)
+rule_files: []
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # CockroachDB metrics
+  - job_name: 'cockroachdb'
+    metrics_path: '/_status/vars'
+    static_configs:
+      - targets: ['db:8080']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'bloom-cockroachdb'
+
+  # Redis metrics via redis_exporter
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'bloom-redis'
+
+  # Docker container metrics via cAdvisor
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    metric_relabel_configs:
+      - source_labels: [container_label_com_docker_compose_service]
+        target_label: service
+      - source_labels: [name]
+        target_label: container
+
+  # Application metrics (if Next.js exposes /metrics)
+  # - job_name: 'bloom-app'
+  #   metrics_path: '/api/metrics'
+  #   static_configs:
+  #     - targets: ['app:3000']

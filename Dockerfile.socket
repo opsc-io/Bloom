@@ -1,0 +1,32 @@
+FROM node:20-alpine
+WORKDIR /app
+
+# Prisma needs OpenSSL + glibc compat on Alpine
+RUN apk add --no-cache libc6-compat openssl
+
+# Copy package files
+COPY package*.json ./
+COPY prisma ./prisma
+COPY prisma.config.ts ./
+
+# Provide dummy DATABASE_URL for prisma generate during build
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy"
+
+# Install dependencies
+RUN npm ci
+
+# Generate Prisma client
+RUN npx prisma generate
+
+# Copy source files needed for socket server
+COPY src/lib ./src/lib
+COPY src/generated ./src/generated
+COPY scripts/socket-server.ts ./scripts/
+COPY tsconfig.json ./
+
+ENV NODE_ENV=production
+ENV SOCKET_PORT=4000
+
+EXPOSE 4000
+
+CMD ["npx", "tsx", "scripts/socket-server.ts"]

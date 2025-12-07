@@ -1,21 +1,40 @@
-import { betterAuth, boolean } from 'better-auth'
+import { betterAuth } from 'better-auth'
 import { prismaAdapter } from 'better-auth/adapters/prisma'
-import prisma from '@/lib/prisma'
-import { admin } from 'better-auth/plugins/admin'
-import nodemailer from 'nodemailer'
-
-// SMTP2Go transporter for sending emails
-const transporter = nodemailer.createTransport({
-  host: 'mail.smtp2go.com',
-  port: 2525,
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASSWORD,
-  },
-})
+import prisma from './prisma'
+import { twoFactor } from 'better-auth/plugins'
+import { createTransport } from 'nodemailer'
+import { hashPassword, verifyPassword } from './password'
 
 
+// Async email sender that loads env vars at call time
+async function sendEmail(options: {
+  to: string
+  subject: string
+  html: string
+}) {
+  // Read env vars at runtime, not at module load time
+  const smtpUser = process.env.SMTP_USER
+  const smtpPass = process.env.SMTP_PASSWORD
+
+  if (!smtpUser || !smtpPass) {
+    throw new Error('SMTP credentials not configured. Set SMTP_USER and SMTP_PASSWORD environment variables.')
+  }
+
+  const transporter = createTransport({
+    host: 'mail.smtp2go.com',
+    port: 2525,
+    secure: false,
+    auth: {
+      user: smtpUser,
+      pass: smtpPass,
+    },
+  })
+
+  return transporter.sendMail({
+    from: '"Bloom Health" <noreply@bloomhealth.us>',
+    ...options,
+  })
+}
 
 // Handle dynamic Vercel URLs for preview deployments
 const getBaseURL = () => {
@@ -29,6 +48,8 @@ const getBaseURL = () => {
 }
 
 export const auth = betterAuth({
+  secret: process.env.BETTER_AUTH_SECRET,
+  experimental: { joins: true },
   baseURL: getBaseURL(),
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
@@ -42,23 +63,38 @@ export const auth = betterAuth({
   ].filter(Boolean),
   emailAndPassword: {
     enabled: true,
+    disableSignUp: false,
+    requireEmailVerification: true,
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
+    autoSignIn: true,
+    resetPasswordTokenExpiresIn: 3600, // 1 hour
+    password: {
+      hash: async (password) => {
+        // Custom password hashing
+        return hashPassword(password);
+      },
+      verify: async ({ hash, password }) => {
+        // Custom password verification
+        return verifyPassword(hash, password);
+      }
+    },
     sendResetPassword: async ({ user, url }) => {
-      await transporter.sendMail({
-        from: '"Bloom Health" <noreply@bloomhealth.us>',
+      await sendEmail({
         to: user.email,
-        subject: 'Reset your Bloom password',
+        subject: 'Reset your Bloom Health password',
         html: `
-          <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #333;">Reset Your Password</h2>
             <p>Hi ${user.name || 'there'},</p>
             <p>We received a request to reset your password. Click the button below to create a new password:</p>
-            <p style="text-align: center; margin: 30px 0;">
+            <p style="margin: 30px 0;">
               <a href="${url}" style="background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
                 Reset Password
               </a>
             </p>
             <p>Or copy and paste this link into your browser:</p>
-            <p style="word-break: break-all; color: #666;">${url}</p>
+            <p style="color: #666; word-break: break-all;">${url}</p>
             <p>This link will expire in 1 hour.</p>
             <p>If you didn't request this, you can safely ignore this email.</p>
             <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
@@ -79,17 +115,15 @@ export const auth = betterAuth({
         type: 'string',
         input: true,
       },
-      therapist: {
-        type: 'boolean',
-        required: false,
+      role: {
+        type: 'string',
         input: false,
-        default: false
+        default: 'UNSET',
       },
       administrator: {
         type: 'boolean',
-        required: false,
         input: false,
-        default: false
+        default: false,
       },
     },
   },
@@ -110,6 +144,74 @@ export const auth = betterAuth({
       clientId: process.env.ZOOM_CLIENT_ID as string,
       clientSecret: process.env.ZOOM_CLIENT_SECRET as string,
     },
-
   },
+  emailVerification: {
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmail({
+        to: user.email,
+        subject: 'Verify your Bloom Health email',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #333;">Verify Your Email</h2>
+            <p>Hi ${user.name || 'there'},</p>
+            <p>Thanks for signing up for Bloom Health! Please verify your email address by clicking the button below:</p>
+            <p style="margin: 30px 0;">
+              <a href="${url}" style="background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                Verify Email
+              </a>
+            </p>
+            <p>Or copy and paste this link into your browser:</p>
+            <p style="color: #666; word-break: break-all;">${url}</p>
+            <p>This link will expire in 24 hours.</p>
+            <p>If you didn't create an account, you can safely ignore this email.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+            <p style="color: #999; font-size: 12px;">Bloom Health</p>
+          </div>
+        `,
+      })
+    },
+  },
+  plugins: [
+    twoFactor({
+      schema: {
+        user: {
+          fields: {
+            twoFactorEnabled: "twoFactorEnabled",
+          },
+        },
+        twoFactor: {
+          modelName: "twoFactor",
+          fields: {
+            secret: "secret",
+            backupCodes: "backupCodes",
+            userId: "userId",
+          },
+        },
+      },
+      otpOptions: {
+        async sendOTP({ user, otp }) {
+          await sendEmail({
+            to: user.email,
+            subject: 'Your Bloom Health verification code',
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Verification Code</h2>
+                <p>Hi ${user.name || 'there'},</p>
+                <p>Your verification code is:</p>
+                <p style="font-size: 32px; font-weight: bold; color: #7c3aed; letter-spacing: 4px; margin: 30px 0;">
+                  ${otp}
+                </p>
+                <p>This code will expire in 5 minutes.</p>
+                <p>If you didn't request this code, please ignore this email.</p>
+                <hr style="border: none; border-top: 1px solid #eee; margin: 30px 0;" />
+                <p style="color: #999; font-size: 12px;">Bloom Health</p>
+              </div>
+            `,
+          })
+        },
+      },
+    }),
+  ],
 })

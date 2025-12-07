@@ -1,0 +1,108 @@
+# GKE Ingress with Google-managed SSL certificate
+# Uses GKE's built-in Ingress controller (Google Cloud Load Balancer)
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: bloom-sa
+  namespace: bloom
+---
+# Managed Certificate for automatic SSL
+apiVersion: networking.gke.io/v1
+kind: ManagedCertificate
+metadata:
+  name: bloom-certificate
+  namespace: bloom
+spec:
+  domains:
+    - bloom.example.com  # Replace with your domain
+---
+# Frontend Config for HTTPS redirect
+apiVersion: networking.gke.io/v1beta1
+kind: FrontendConfig
+metadata:
+  name: bloom-frontend-config
+  namespace: bloom
+spec:
+  redirectToHttps:
+    enabled: true
+    responseCodeName: MOVED_PERMANENTLY_DEFAULT
+---
+# Main Ingress
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: bloom-ingress
+  namespace: bloom
+  annotations:
+    # Use GKE Ingress controller
+    kubernetes.io/ingress.class: "gce"
+    # Google-managed SSL certificate
+    networking.gke.io/managed-certificates: "bloom-certificate"
+    # HTTPS redirect
+    networking.gke.io/v1beta1.FrontendConfig: "bloom-frontend-config"
+    # Static IP (create with: gcloud compute addresses create bloom-ip --global)
+    kubernetes.io/ingress.global-static-ip-name: "bloom-ip"
+spec:
+  rules:
+    - host: bloom.example.com  # Replace with your domain
+      http:
+        paths:
+          # Socket.io WebSocket endpoint
+          - path: /socket.io/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: bloom-socket
+                port:
+                  number: 80
+          # All other traffic to the app
+          - path: /*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: bloom-app
+                port:
+                  number: 80
+---
+# Alternative: Nginx Ingress Controller (more features, but requires installation)
+# Uncomment below if using nginx-ingress instead of GKE default
+
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: bloom-ingress-nginx
+#   namespace: bloom
+#   annotations:
+#     kubernetes.io/ingress.class: "nginx"
+#     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+#     nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+#     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+#     nginx.ingress.kubernetes.io/upstream-hash-by: "$remote_addr"
+#     nginx.ingress.kubernetes.io/affinity: "cookie"
+#     nginx.ingress.kubernetes.io/session-cookie-name: "bloom-sticky"
+#     nginx.ingress.kubernetes.io/session-cookie-expires: "172800"
+#     nginx.ingress.kubernetes.io/session-cookie-max-age: "172800"
+# spec:
+#   tls:
+#     - hosts:
+#         - bloom.example.com
+#       secretName: bloom-tls
+#   rules:
+#     - host: bloom.example.com
+#       http:
+#         paths:
+#           - path: /socket.io
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: bloom-socket
+#                 port:
+#                   number: 80
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: bloom-app
+#                 port:
+#                   number: 80

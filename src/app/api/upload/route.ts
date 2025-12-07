@@ -1,64 +1,48 @@
-import { put, del, list } from '@vercel/blob'
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from "next/server";
+import { put } from "@vercel/blob";
+import { auth } from "@/lib/auth";
+import { headers } from "next/headers";
 
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    const formData = await request.formData()
-    const file = formData.get('file') as File
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
 
-    if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    if (!session?.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Optional: get folder path from form data
-    const folder = formData.get('folder') as string || ''
-    const filename = folder ? `${folder}/${file.name}` : file.name
-
-    const blob = await put(filename, file, {
-      access: 'public',
-    })
-
-    return NextResponse.json(blob)
-  } catch (error) {
-    console.error('Upload error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Upload failed' },
-      { status: 500 }
-    )
-  }
-}
-
-export async function DELETE(request: NextRequest) {
-  try {
-    const { url } = await request.json()
-
-    if (!url) {
-      return NextResponse.json({ error: 'No URL provided' }, { status: 400 })
+    const blobToken = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!blobToken) {
+      console.error("Missing BLOB_READ_WRITE_TOKEN env var for uploads");
+      return NextResponse.json(
+        { error: "Upload misconfigured. Contact support." },
+        { status: 500 }
+      );
     }
 
-    await del(url)
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Delete error:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Delete failed' },
-      { status: 500 }
-    )
-  }
-}
+    const formData = await req.formData();
+    const file = formData.get("file") as File | null;
 
-export async function GET(request: NextRequest) {
-  try {
-    const { searchParams } = new URL(request.url)
-    const prefix = searchParams.get('prefix') || undefined
+    if (!file || typeof file === "string") {
+      return NextResponse.json({ error: "No file provided" }, { status: 400 });
+    }
 
-    const { blobs } = await list({ prefix })
-    return NextResponse.json({ blobs })
+    const safeName = file.name?.replace(/\s+/g, "-").replace(/[^\w.\-]/g, "") || "upload";
+    const key = `uploads/${session.user.id}/${Date.now()}-${safeName}`;
+
+    const blob = await put(key, file, {
+      access: "public",
+      token: blobToken,
+    });
+
+    return NextResponse.json({ url: blob.url, pathname: blob.pathname });
   } catch (error) {
-    console.error('List error:', error)
+    console.error("Error uploading file:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'List failed' },
+      { error: "Upload failed" },
       { status: 500 }
-    )
+    );
   }
 }

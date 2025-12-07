@@ -1,0 +1,62 @@
+# Promtail configuration for Bloom self-hosted stack
+# Collects Docker container logs and ships to Loki
+
+server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  # Docker container logs
+  - job_name: docker
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Only scrape containers with bloom- prefix
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/bloom-.*'
+        action: keep
+
+      # Use container name as job label
+      - source_labels: ['__meta_docker_container_name']
+        regex: '/(.*)'
+        target_label: 'container'
+
+      # Add container ID
+      - source_labels: ['__meta_docker_container_id']
+        target_label: 'container_id'
+
+      # Rename log stream path
+      - replacement: /var/lib/docker/containers/$1/*-json.log
+        source_labels: ['__meta_docker_container_id']
+        target_label: __path__
+
+    pipeline_stages:
+      # Parse Docker JSON logs
+      - docker: {}
+
+      # Extract log level from common patterns
+      - regex:
+          expression: '(?P<level>(DEBUG|INFO|WARN|ERROR|FATAL))'
+
+      # Add log level label
+      - labels:
+          level:
+
+      # Parse JSON logs from Next.js
+      - json:
+          expressions:
+            message: message
+            level: level
+            timestamp: timestamp
+          source: output
+
+      # Fallback: use raw log as message
+      - output:
+          source: message

@@ -9,6 +9,7 @@ import {
   Sparkles,
 } from "lucide-react"
 import { signOut } from "@/lib/auth-client"
+import { useRouter } from "next/navigation"
 
 import {
   Avatar,
@@ -35,6 +36,7 @@ export function NavUser({
   user,
 }: {
   user: {
+    id?: string
     firstname?: string | null
     lastname?: string | null
     email?: string | null
@@ -42,6 +44,7 @@ export function NavUser({
   }
 }) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
   const displayName = [user.firstname, user.lastname].join(" ").trim() || "User"
   const displayEmail = user.email ?? ""
   const fallbackInitial =
@@ -91,16 +94,16 @@ export function NavUser({
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(`/profile/${user.id}`)}>
                 <Sparkles />
-                Upgrade to Pro
+                Profile
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
             <DropdownMenuGroup>
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push("/settings")}>
                 <BadgeCheck />
-                Account
+                Settings
               </DropdownMenuItem>
               <DropdownMenuItem>
                 <CreditCard />

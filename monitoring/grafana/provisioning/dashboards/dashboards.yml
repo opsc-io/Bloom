@@ -1,0 +1,17 @@
+# Grafana Dashboards Provisioning
+# Auto-loads dashboards from /var/lib/grafana/dashboards
+
+apiVersion: 1
+
+providers:
+  - name: 'Bloom Dashboards'
+    orgId: 1
+    folder: 'Bloom'
+    folderUid: 'bloom'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards
+      foldersFromFilesStructure: false
