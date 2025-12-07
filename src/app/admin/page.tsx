@@ -218,6 +218,8 @@ function AdminContent() {
     return <Badge variant="outline">Patient</Badge>;
   };
 
+  const grafanaBase = grafanaUrl?.split('/d/')[0] || '';
+
   return (
     <SidebarProvider>
       {/* Custom Admin Sidebar */}
@@ -523,26 +525,112 @@ function AdminContent() {
                     <p className="text-muted-foreground">CockroachDB metrics and health</p>
                   </div>
                   <Button variant="outline" size="sm" asChild>
-                    <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
+                    <a href={`${grafanaBase}/d/bloom-cockroachdb/cockroachdb`} target="_blank" rel="noopener noreferrer">
                       <BarChart3 className="mr-2 h-4 w-4" />
-                      Open Grafana <ExternalLink className="ml-1 h-3 w-3" />
+                      Full Dashboard <ExternalLink className="ml-1 h-3 w-3" />
                     </a>
                   </Button>
                 </div>
 
-                <Card className="flex flex-col items-center justify-center py-12">
-                  <Database className="h-16 w-16 text-muted-foreground mb-4" />
-                  <CardTitle className="text-xl mb-2">Database Metrics</CardTitle>
-                  <CardDescription className="text-center max-w-md mb-4">
-                    View CockroachDB performance metrics, query latency, connection pool status, and storage utilization in Grafana.
-                  </CardDescription>
-                  <Button asChild>
-                    <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Open Grafana Dashboard <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </Button>
-                </Card>
+                {grafanaBase ? (
+                  <>
+                    {/* Database Stats Row */}
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="rounded-lg overflow-hidden border bg-white">
+                        <iframe
+                          src={`${grafanaBase}/d-solo/bloom-cockroachdb/cockroachdb?orgId=1&panelId=1&theme=light`}
+                          width="100%"
+                          height="120"
+                          frameBorder="0"
+                          title="Active Connections"
+                        />
+                      </div>
+                      <div className="rounded-lg overflow-hidden border bg-white">
+                        <iframe
+                          src={`${grafanaBase}/d-solo/bloom-cockroachdb/cockroachdb?orgId=1&panelId=2&theme=light`}
+                          width="100%"
+                          height="120"
+                          frameBorder="0"
+                          title="Live Nodes"
+                        />
+                      </div>
+                      <div className="rounded-lg overflow-hidden border bg-white">
+                        <iframe
+                          src={`${grafanaBase}/d-solo/bloom-cockroachdb/cockroachdb?orgId=1&panelId=3&theme=light`}
+                          width="100%"
+                          height="120"
+                          frameBorder="0"
+                          title="Storage Used %"
+                        />
+                      </div>
+                      <div className="rounded-lg overflow-hidden border bg-white">
+                        <iframe
+                          src={`${grafanaBase}/d-solo/bloom-cockroachdb/cockroachdb?orgId=1&panelId=4&theme=light`}
+                          width="100%"
+                          height="120"
+                          frameBorder="0"
+                          title="Storage Used"
+                        />
+                      </div>
+                    </div>
+
+                    {/* SQL Operations & Latency */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-cockroachdb/cockroachdb?orgId=1&panelId=5&theme=light`}
+                            width="100%"
+                            height="300"
+                            frameBorder="0"
+                            title="SQL Operations Rate"
+                          />
+                        </div>
+                      </Card>
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-cockroachdb/cockroachdb?orgId=1&panelId=6&theme=light`}
+                            width="100%"
+                            height="300"
+                            frameBorder="0"
+                            title="Query Latency"
+                          />
+                        </div>
+                      </Card>
+                    </div>
+
+                    {/* Transactions */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-cockroachdb/cockroachdb?orgId=1&panelId=7&theme=light`}
+                            width="100%"
+                            height="250"
+                            frameBorder="0"
+                            title="Transactions"
+                          />
+                        </div>
+                      </Card>
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-cockroachdb/cockroachdb?orgId=1&panelId=8&theme=light`}
+                            width="100%"
+                            height="250"
+                            frameBorder="0"
+                            title="Connections & Open Transactions"
+                          />
+                        </div>
+                      </Card>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-[400px] items-center justify-center text-muted-foreground">
+                    Loading database metrics...
+                  </div>
+                )}
               </div>
             )}
 
@@ -555,26 +643,85 @@ function AdminContent() {
                     <p className="text-muted-foreground">CPU, memory, network, and disk I/O metrics</p>
                   </div>
                   <Button variant="outline" size="sm" asChild>
-                    <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
+                    <a href={`${grafanaBase}/d/bloom-containers/container-resources`} target="_blank" rel="noopener noreferrer">
                       <BarChart3 className="mr-2 h-4 w-4" />
-                      Open Grafana <ExternalLink className="ml-1 h-3 w-3" />
+                      Full Dashboard <ExternalLink className="ml-1 h-3 w-3" />
                     </a>
                   </Button>
                 </div>
 
-                <Card className="flex flex-col items-center justify-center py-12">
-                  <Container className="h-16 w-16 text-muted-foreground mb-4" />
-                  <CardTitle className="text-xl mb-2">Container Metrics</CardTitle>
-                  <CardDescription className="text-center max-w-md mb-4">
-                    View CPU usage, memory consumption, network I/O, and container restart counts in Grafana.
-                  </CardDescription>
-                  <Button asChild>
-                    <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Open Grafana Dashboard <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </Button>
-                </Card>
+                {grafanaBase ? (
+                  <>
+                    {/* CPU & Memory */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-containers/container-resources?orgId=1&panelId=1&theme=light`}
+                            width="100%"
+                            height="300"
+                            frameBorder="0"
+                            title="CPU Usage by Container"
+                          />
+                        </div>
+                      </Card>
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-containers/container-resources?orgId=1&panelId=2&theme=light`}
+                            width="100%"
+                            height="300"
+                            frameBorder="0"
+                            title="Memory Usage by Container"
+                          />
+                        </div>
+                      </Card>
+                    </div>
+
+                    {/* Network & Disk I/O */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-containers/container-resources?orgId=1&panelId=3&theme=light`}
+                            width="100%"
+                            height="300"
+                            frameBorder="0"
+                            title="Network I/O"
+                          />
+                        </div>
+                      </Card>
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-containers/container-resources?orgId=1&panelId=4&theme=light`}
+                            width="100%"
+                            height="300"
+                            frameBorder="0"
+                            title="Disk I/O"
+                          />
+                        </div>
+                      </Card>
+                    </div>
+
+                    {/* Container Restarts */}
+                    <Card className="p-0 overflow-hidden">
+                      <div className="bg-white">
+                        <iframe
+                          src={`${grafanaBase}/d-solo/bloom-containers/container-resources?orgId=1&panelId=5&theme=light`}
+                          width="100%"
+                          height="250"
+                          frameBorder="0"
+                          title="Container Restarts (24h)"
+                        />
+                      </div>
+                    </Card>
+                  </>
+                ) : (
+                  <div className="flex h-[400px] items-center justify-center text-muted-foreground">
+                    Loading container metrics...
+                  </div>
+                )}
               </div>
             )}
 
@@ -587,26 +734,112 @@ function AdminContent() {
                     <p className="text-muted-foreground">Cache performance, memory usage, and pub/sub activity</p>
                   </div>
                   <Button variant="outline" size="sm" asChild>
-                    <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
+                    <a href={`${grafanaBase}/d/bloom-redis/redis-metrics`} target="_blank" rel="noopener noreferrer">
                       <BarChart3 className="mr-2 h-4 w-4" />
-                      Open Grafana <ExternalLink className="ml-1 h-3 w-3" />
+                      Full Dashboard <ExternalLink className="ml-1 h-3 w-3" />
                     </a>
                   </Button>
                 </div>
 
-                <Card className="flex flex-col items-center justify-center py-12">
-                  <HardDrive className="h-16 w-16 text-muted-foreground mb-4" />
-                  <CardTitle className="text-xl mb-2">Redis Metrics</CardTitle>
-                  <CardDescription className="text-center max-w-md mb-4">
-                    View cache hit rates, memory usage, connected clients, and pub/sub activity in Grafana.
-                  </CardDescription>
-                  <Button asChild>
-                    <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Open Grafana Dashboard <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </Button>
-                </Card>
+                {grafanaBase ? (
+                  <>
+                    {/* Redis Stats Row */}
+                    <div className="grid grid-cols-4 gap-4">
+                      <div className="rounded-lg overflow-hidden border bg-white">
+                        <iframe
+                          src={`${grafanaBase}/d-solo/bloom-redis/redis-metrics?orgId=1&panelId=1&theme=light`}
+                          width="100%"
+                          height="120"
+                          frameBorder="0"
+                          title="Redis Status"
+                        />
+                      </div>
+                      <div className="rounded-lg overflow-hidden border bg-white">
+                        <iframe
+                          src={`${grafanaBase}/d-solo/bloom-redis/redis-metrics?orgId=1&panelId=2&theme=light`}
+                          width="100%"
+                          height="120"
+                          frameBorder="0"
+                          title="Memory Used"
+                        />
+                      </div>
+                      <div className="rounded-lg overflow-hidden border bg-white">
+                        <iframe
+                          src={`${grafanaBase}/d-solo/bloom-redis/redis-metrics?orgId=1&panelId=3&theme=light`}
+                          width="100%"
+                          height="120"
+                          frameBorder="0"
+                          title="Connected Clients"
+                        />
+                      </div>
+                      <div className="rounded-lg overflow-hidden border bg-white">
+                        <iframe
+                          src={`${grafanaBase}/d-solo/bloom-redis/redis-metrics?orgId=1&panelId=4&theme=light`}
+                          width="100%"
+                          height="120"
+                          frameBorder="0"
+                          title="Total Keys (db0)"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Commands & Hit Rate */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-redis/redis-metrics?orgId=1&panelId=5&theme=light`}
+                            width="100%"
+                            height="300"
+                            frameBorder="0"
+                            title="Commands per Second"
+                          />
+                        </div>
+                      </Card>
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-redis/redis-metrics?orgId=1&panelId=6&theme=light`}
+                            width="100%"
+                            height="300"
+                            frameBorder="0"
+                            title="Cache Hit Rate"
+                          />
+                        </div>
+                      </Card>
+                    </div>
+
+                    {/* Memory & Pub/Sub */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-redis/redis-metrics?orgId=1&panelId=7&theme=light`}
+                            width="100%"
+                            height="300"
+                            frameBorder="0"
+                            title="Memory Usage"
+                          />
+                        </div>
+                      </Card>
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-redis/redis-metrics?orgId=1&panelId=8&theme=light`}
+                            width="100%"
+                            height="300"
+                            frameBorder="0"
+                            title="Pub/Sub Activity"
+                          />
+                        </div>
+                      </Card>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex h-[400px] items-center justify-center text-muted-foreground">
+                    Loading Redis metrics...
+                  </div>
+                )}
               </div>
             )}
 
@@ -619,26 +852,59 @@ function AdminContent() {
                     <p className="text-muted-foreground">Live logs, errors, and warnings from all containers</p>
                   </div>
                   <Button variant="outline" size="sm" asChild>
-                    <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
+                    <a href={`${grafanaBase}/d/bloom-overview/bloom-overview`} target="_blank" rel="noopener noreferrer">
                       <BarChart3 className="mr-2 h-4 w-4" />
-                      Open Grafana <ExternalLink className="ml-1 h-3 w-3" />
+                      Full Dashboard <ExternalLink className="ml-1 h-3 w-3" />
                     </a>
                   </Button>
                 </div>
 
-                <Card className="flex flex-col items-center justify-center py-12">
-                  <FileText className="h-16 w-16 text-muted-foreground mb-4" />
-                  <CardTitle className="text-xl mb-2">Application Logs</CardTitle>
-                  <CardDescription className="text-center max-w-md mb-4">
-                    View live application logs, filter by container, and search for errors in Grafana.
-                  </CardDescription>
-                  <Button asChild>
-                    <a href={grafanaUrl} target="_blank" rel="noopener noreferrer">
-                      <BarChart3 className="mr-2 h-4 w-4" />
-                      Open Grafana Dashboard <ExternalLink className="ml-1 h-3 w-3" />
-                    </a>
-                  </Button>
-                </Card>
+                {grafanaBase ? (
+                  <>
+                    {/* Log Volume & Errors */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-overview/bloom-overview?orgId=1&panelId=4&theme=light`}
+                            width="100%"
+                            height="250"
+                            frameBorder="0"
+                            title="Log Volume by Container"
+                          />
+                        </div>
+                      </Card>
+                      <Card className="p-0 overflow-hidden">
+                        <div className="bg-white">
+                          <iframe
+                            src={`${grafanaBase}/d-solo/bloom-overview/bloom-overview?orgId=1&panelId=5&theme=light`}
+                            width="100%"
+                            height="250"
+                            frameBorder="0"
+                            title="Errors and Warnings"
+                          />
+                        </div>
+                      </Card>
+                    </div>
+
+                    {/* Application Logs */}
+                    <Card className="p-0 overflow-hidden">
+                      <div className="bg-white">
+                        <iframe
+                          src={`${grafanaBase}/d-solo/bloom-overview/bloom-overview?orgId=1&panelId=1&theme=light`}
+                          width="100%"
+                          height="500"
+                          frameBorder="0"
+                          title="Application Logs"
+                        />
+                      </div>
+                    </Card>
+                  </>
+                ) : (
+                  <div className="flex h-[400px] items-center justify-center text-muted-foreground">
+                    Loading logs...
+                  </div>
+                )}
               </div>
             )}
           </main>
