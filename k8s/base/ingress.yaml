@@ -56,6 +56,14 @@ spec:
                 name: bloom-socket
                 port:
                   number: 80
+          # Grafana dashboard
+          - path: /grafana/*
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 3000
           # All other traffic to the app
           - path: /*
             pathType: ImplementationSpecific
