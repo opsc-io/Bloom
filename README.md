@@ -1,29 +1,135 @@
 <div align="center">
-  <!-- place `public/logo.png` to show the app logo here -->
   <img src="/logo.svg" alt="App logo" width="160" />
   <h1>Bloom — Therapy Practice Platform</h1>
 </div>
 
-## Frameworks used
+## Tech Stack
 
-- Next.js (App Router, TypeScript)
-- Prisma (CockroachDB)
-- Better Auth (Prisma adapter, OAuth, 2FA)
-- shadcn/ui (Tailwind + Radix)
-- Socket.io (messaging transport)
-- Redis (messaging cache/invalidations)
-- Vercel Blob (file uploads)
+- **Frontend**: Next.js 16 (App Router, TypeScript), shadcn/ui (Tailwind + Radix)
+- **Backend**: Next.js API Routes, Socket.io (real-time messaging)
+- **Database**: CockroachDB (self-hosted in Kubernetes)
+- **Cache**: Redis (self-hosted StatefulSet)
+- **Auth**: Better Auth (Prisma adapter, OAuth, 2FA)
+- **Storage**: Google Cloud Storage (file uploads)
+- **Observability**: Prometheus, Grafana, Loki, Promtail
+
+## Architecture
+
+Bloom is a fully self-hosted platform running on Google Kubernetes Engine (GKE) with HA, auto-scaling, and a complete observability stack.
+
+```
+                              ┌─────────────────────────────────┐
+                              │      Cloud DNS / Domain         │
+                              │  bloomhealth.us | *.gcp.bloom   │
+                              └────────────────┬────────────────┘
+                                               │
+                              ┌────────────────▼────────────────┐
+                              │   Global Load Balancer (GCE)    │
+                              │   + Managed SSL Certificate     │
+                              │   + Static IP (bloom-prod-ip)   │
+                              └────────────────┬────────────────┘
+                                               │
+┌──────────────────────────────────────────────▼──────────────────────────────────────────────┐
+│                              GKE Autopilot Cluster (Regional HA)                            │
+│                                      us-central1                                            │
+├─────────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                              Application Layer (Auto-scaled)                         │   │
+│  │  ┌───────────────────────────────┐    ┌───────────────────────────────┐             │   │
+│  │  │         bloom-app             │    │        bloom-socket           │             │   │
+│  │  │   (Next.js 16 + API Routes)   │    │   (Socket.io Real-time)       │             │   │
+│  │  │   HPA: 2-10 replicas          │    │   HPA: 2-10 replicas          │             │   │
+│  │  │   PDB: minAvailable=1         │    │   PDB: minAvailable=1         │             │   │
+│  │  └───────────────────────────────┘    └───────────────────────────────┘             │   │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘   │
+│                                               │                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                              Data Layer (StatefulSets)                               │   │
+│  │  ┌───────────────────────────────┐    ┌───────────────────────────────┐             │   │
+│  │  │        CockroachDB            │    │           Redis               │             │   │
+│  │  │   (3 replicas for HA)         │    │   (Primary + Sentinel)        │             │   │
+│  │  │   Persistent Volume: 10Gi    │    │   Persistent Volume: 1Gi     │             │   │
+│  │  └───────────────────────────────┘    └───────────────────────────────┘             │   │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘   │
+│                                               │                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────────────┐   │
+│  │                              Observability Stack                                     │   │
+│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                 │   │
+│  │  │ Prometheus  │  │   Grafana   │  │    Loki     │  │  Promtail   │                 │   │
+│  │  │  (metrics)  │  │ (dashboards)│  │   (logs)    │  │ (DaemonSet) │                 │   │
+│  │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘                 │   │
+│  └─────────────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                             │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
+                                               │
+                              ┌────────────────▼────────────────┐
+                              │   Google Cloud Storage (GCS)    │
+                              │   bloom-uploads-{dev|qa|prod}   │
+                              │   + Workload Identity Access    │
+                              └─────────────────────────────────┘
+```
+
+### Production HA Features
+
+- **Regional GKE Autopilot**: Multi-zone redundancy in us-central1
+- **Auto-scaling**: HPA scales pods 2-10 based on CPU/memory
+- **Pod Disruption Budgets**: Ensures availability during updates
+- **CockroachDB HA**: 3-node cluster with automatic failover
+- **Managed SSL**: Auto-renewed certificates via GKE
+- **Workload Identity**: No service account keys needed
+
+### Environments
+
+#### Development
+| Resource | Value |
+|----------|-------|
+| Cluster | `bloom-dev-cluster` (us-central1-a, zonal) |
+| URL | https://dev.gcp.bloomhealth.us |
+| Branch | `dev` |
+| Static IP | `bloom-dev-ip` (34.117.169.137) |
+| GCS Bucket | `bloom-uploads-dev` |
+| CockroachDB | 1 replica (single node) |
+| Workflow | `.github/workflows/deploy-dev.yml` |
+
+#### QA
+| Resource | Value |
+|----------|-------|
+| Cluster | `bloom-qa-cluster` (us-central1, regional Autopilot) |
+| URL | https://qa.gcp.bloomhealth.us |
+| Branch | `qa` |
+| Static IP | `bloom-qa-ip` (34.117.179.36) |
+| GCS Bucket | `bloom-uploads-qa` |
+| CockroachDB | 1 replica |
+| Workflow | `.github/workflows/deploy-qa.yml` |
+
+#### Production
+| Resource | Value |
+|----------|-------|
+| Cluster | `bloom-prod-cluster` (us-central1, regional Autopilot HA) |
+| URL | https://bloomhealth.us |
+| Branch | `main` |
+| Static IP | `bloom-prod-ip` (130.211.29.63) |
+| GCS Bucket | `bloom-uploads-prod` |
+| CockroachDB | 3 replicas (HA) |
+| Workflow | `.github/workflows/deploy-prod.yml` |
+
+### CI/CD
+
+- **GitHub Actions** for automated deployments
+- **Workload Identity Federation** for secure GCP authentication (no service account keys)
+- **Kustomize** for environment-specific configurations
 
 ## Overview
 
-Bloom helps therapists set up and operate a practice from onboarding to billing and patient care. It combines credentialing automation, telehealth, payments, a lightweight EHR, and realtime messaging in two delivery modes: self-hosted and cloud multi-tenant.
+Bloom helps therapists set up and operate a practice from onboarding to billing and patient care. It combines credentialing automation, telehealth, payments, a lightweight EHR, and realtime messaging.
 
 ## Product vision
 
 Create an open-source platform inspired by Alma and Headway, offering:
 
-- A self-hosted guided workflow for therapists who want full control.
-- A low-cost managed multi-tenant SaaS for therapists who prefer a hosted option.
+- A fully self-hosted platform for therapists who want full control and data sovereignty.
+- Complete infrastructure-as-code for reproducible deployments on any Kubernetes cluster.
 
 ## Key differentiators
 
@@ -40,7 +146,7 @@ Create an open-source platform inspired by Alma and Headway, offering:
 - Appointment CRUD APIs with role-aware access; calendar UI (week offsets)
 - Therapist↔patient assignment model and API (current/past therapist relationships)
 - Admin stats and Grafana proxy endpoints with admin dashboard UI
-- File upload API via Vercel Blob
+- File upload API (GCS/MinIO)
 - People discovery endpoints and pages (available therapists, connections)
 - Seed scripts for admin + Faker users, appointments, conversations, and assignments
 
@@ -161,7 +267,7 @@ Overall goal: Enable passkeys (WebAuthn) and TOTP for strong, auditable multi-fa
 ### 5.1. Secure Storage
 
 - [ ] Configure MinIO/S3 bucket policies for HIPAA compliance (private objects, encryption at rest).
-- [x] Implement API endpoints to generate short-lived upload URLs (Vercel Blob) and store metadata.
+- [x] Implement API endpoints to generate short-lived upload URLs (GCS/MinIO) and store metadata.
 - [ ] Create UI for managing session notes and patient-uploaded documents.
 
 ### 5.2. EHR Schema
@@ -283,19 +389,107 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deployment
+
+### CI/CD Pipeline
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   GitHub    │     │   GitHub    │     │  Artifact   │     │     GKE     │
+│    Push     │────▶│   Actions   │────▶│  Registry   │────▶│   Cluster   │
+└─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
+      │                   │                   │                    │
+      │              Build Docker        Push Images          kubectl apply
+      │              Run Tests           bloom-app             Kustomize
+      │                                  bloom-socket          overlay
+      │
+      ▼
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         Branch → Environment                            │
+├─────────────────────────────────────────────────────────────────────────┤
+│  dev branch   ──▶  bloom-dev-cluster   ──▶  dev.gcp.bloomhealth.us     │
+│  qa branch    ──▶  bloom-qa-cluster    ──▶  qa.gcp.bloomhealth.us      │
+│  main branch  ──▶  bloom-prod-cluster  ──▶  bloomhealth.us             │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Workflow Files
+
+| Workflow | Branch | Cluster | Domain |
+|----------|--------|---------|--------|
+| `.github/workflows/deploy-dev.yml` | `dev` | bloom-dev-cluster | dev.gcp.bloomhealth.us |
+| `.github/workflows/deploy-qa.yml` | `qa` | bloom-qa-cluster | qa.gcp.bloomhealth.us |
+| `.github/workflows/deploy-prod.yml` | `main` | bloom-prod-cluster | bloomhealth.us |
+
+### Prerequisites
+
+- GCP Project with GKE API enabled
+- Docker for building images
+- kubectl and gcloud CLI installed
+- Workload Identity Federation configured
+
+### Local Development
+
+```bash
+# Start local services (CockroachDB, Redis)
+docker-compose up -d
+
+# Run the app
+npm run dev
+```
+
+### Deploy to GKE (Automated)
+
+Simply push to the appropriate branch:
+
+```bash
+# Deploy to dev
+git checkout dev && git push origin dev
+
+# Deploy to QA (via PR merge)
+git checkout qa && git merge dev && git push origin qa
+
+# Deploy to production (via PR merge)
+git checkout main && git merge qa && git push origin main
+```
+
+### GCS Storage Buckets
+
+| Environment | Bucket Name |
+|-------------|-------------|
+| Dev | `bloom-uploads-dev` |
+| QA | `bloom-uploads-qa` |
+| Prod | `bloom-uploads-prod` |
+
+**Environment Variables:**
+```bash
+GCS_BUCKET_NAME=bloom-uploads-dev  # or qa/prod per environment
+# No credentials needed in GKE - uses Workload Identity
+```
+
+**For local development:**
+```bash
+# Create service account key
+gcloud iam service-accounts keys create gcs-key.json \
+  --iam-account=github-actions-deploy@project-4fc52960-1177-49ec-a6f.iam.gserviceaccount.com
+
+# Set env var
+export GOOGLE_APPLICATION_CREDENTIALS=./gcs-key.json
+```
+
+### Manual Deployment
+
+```bash
+# Build and push images
+docker build -t us-central1-docker.pkg.dev/PROJECT_ID/bloom-images/bloom-app:latest .
+docker push us-central1-docker.pkg.dev/PROJECT_ID/bloom-images/bloom-app:latest
+
+# Deploy to cluster
+kubectl apply -k k8s/overlays/dev
+```
 
 ## Learn More
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js Documentation](https://nextjs.org/docs)
+- [CockroachDB Docs](https://www.cockroachlabs.com/docs/)
+- [GKE Documentation](https://cloud.google.com/kubernetes-engine/docs)
