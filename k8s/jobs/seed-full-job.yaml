@@ -14,7 +14,8 @@ spec:
       containers:
         - name: seed
           image: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-db-init:dev-latest
-          command: ["npm", "run", "seed"]
+          command: ["npm", "run", "seed:full"]
+          imagePullPolicy: Always
           env:
             - name: DATABASE_URL
               value: "postgresql://root@cockroachdb:26257/bloom?sslmode=disable"
@@ -25,4 +26,4 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-      backoffLimit: 1
+  backoffLimit: 1

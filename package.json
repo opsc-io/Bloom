@@ -10,6 +10,7 @@
     "postinstall": "npx prisma generate",
     "seed": "prisma db seed",
     "seed:admin": "tsx prisma/seed-admin.ts",
+    "seed:full": "tsx prisma/seed-full.ts",
     "socket": "tsx scripts/socket-server.ts"
   },
   "prisma": {

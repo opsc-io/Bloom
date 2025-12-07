@@ -25,4 +25,4 @@ spec:
             limits:
               cpu: "500m"
               memory: "512Mi"
-      backoffLimit: 1
+  backoffLimit: 1
