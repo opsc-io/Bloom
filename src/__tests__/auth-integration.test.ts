@@ -13,13 +13,20 @@ enum UserRole {
   ADMINISTRATOR = "ADMINISTRATOR",
 }
 
-// Mock user data
+// Mock user data - includes all required fields from Prisma User model
 const mockPatient = {
   id: "user-patient-1",
   email: "patient@test.com",
   name: "Test Patient",
+  firstname: "Test",
+  lastname: "Patient",
   role: UserRole.PATIENT,
   emailVerified: true,
+  image: null,
+  bio: null,
+  twoFactorEnabled: null,
+  therapist: null,
+  administrator: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -28,8 +35,15 @@ const mockTherapist = {
   id: "user-therapist-1",
   email: "therapist@test.com",
   name: "Dr. Test Therapist",
+  firstname: "Test",
+  lastname: "Therapist",
   role: UserRole.THERAPIST,
   emailVerified: true,
+  image: null,
+  bio: null,
+  twoFactorEnabled: null,
+  therapist: true,
+  administrator: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -38,8 +52,15 @@ const mockAdmin = {
   id: "user-admin-1",
   email: "admin@test.com",
   name: "Test Admin",
+  firstname: "Test",
+  lastname: "Admin",
   role: UserRole.ADMINISTRATOR,
   emailVerified: true,
+  image: null,
+  bio: null,
+  twoFactorEnabled: null,
+  therapist: null,
+  administrator: true,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -148,15 +169,22 @@ describe("Authentication Integration", () => {
   describe("User Creation", () => {
     it("should create new patient user", async () => {
       const newUser = {
+        id: "user-new-1",
         email: "newpatient@test.com",
         name: "New Patient",
+        firstname: "New",
+        lastname: "Patient",
         role: UserRole.PATIENT,
       };
 
       vi.mocked(prisma.user.create).mockResolvedValueOnce({
-        id: "user-new-1",
         ...newUser,
         emailVerified: false,
+        image: null,
+        bio: null,
+        twoFactorEnabled: null,
+        therapist: null,
+        administrator: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
@@ -170,15 +198,22 @@ describe("Authentication Integration", () => {
 
     it("should create therapist user with correct role", async () => {
       const newTherapist = {
+        id: "user-new-2",
         email: "newtherapist@test.com",
         name: "New Therapist",
+        firstname: "New",
+        lastname: "Therapist",
         role: UserRole.THERAPIST,
       };
 
       vi.mocked(prisma.user.create).mockResolvedValueOnce({
-        id: "user-new-2",
         ...newTherapist,
         emailVerified: false,
+        image: null,
+        bio: null,
+        twoFactorEnabled: null,
+        therapist: true,
+        administrator: null,
         createdAt: new Date(),
         updatedAt: new Date(),
       });
