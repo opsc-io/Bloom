@@ -286,10 +286,18 @@ function MessagesContent() {
 
   const activeConv = conversations.find((c) => c.id === activeConversation);
   const typingEntry = activeConversation ? typingMap[activeConversation] : undefined;
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
+
+  // Update current time periodically for typing indicator expiry check
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, []);
+
   const isTyping =
     typingEntry &&
     typingEntry.userId !== (session?.user as { id?: string })?.id &&
-    typingEntry.expiresAt > Date.now();
+    typingEntry.expiresAt > currentTime;
 
   if (isPending) return <p className="text-center mt-8 text-white">Loading...</p>;
   if (!session?.user) return <p className="text-center mt-8 text-white">Redirecting...</p>;
