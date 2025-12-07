@@ -320,6 +320,7 @@ data:
         type: prometheus
         access: proxy
         url: http://prometheus:9090
+        uid: prometheus
         isDefault: true
       - name: Loki
         type: loki
