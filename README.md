@@ -18,8 +18,7 @@
 Bloom is a fully self-hosted platform running on Google Kubernetes Engine (GKE) with HA, auto-scaling, and a complete observability stack.
 
 
-<img width="3708" height="1492" alt="image" src="https://github.com/user-attachments/assets/508509c4-053e-4f02-9543-c9c952fa5244" />
-
+<img width="1552" height="510" alt="Screenshot 2025-12-06 at 9 47 50 PM" src="https://github.com/user-attachments/assets/b2c09f38-1107-4229-84f1-fe57257c6da1" />
 
 
 
