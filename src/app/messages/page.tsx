@@ -100,8 +100,18 @@ function MessagesContent() {
   const [typingMap, setTypingMap] = useState<Record<string, { userId: string; name?: string | null; expiresAt: number }>>({});
   const socketRef = React.useRef<Socket | null>(null);
   const lastTypingSentRef = React.useRef<number>(0);
+  const messagesEndRef = React.useRef<HTMLDivElement>(null);
 
   const commonEmojis = ["👍", "❤️", "😊", "😂", "🎉", "👏"];
+
+  // Auto-scroll to bottom when messages change
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
 
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -400,7 +410,11 @@ function MessagesContent() {
                   {filteredConversations.map((conversation) => (
                     <div
                       key={conversation.id}
-                      onClick={() => setActiveConversation(conversation.id)}
+                      onClick={() => {
+                        setActiveConversation(conversation.id);
+                        // Clear URL params to prevent auto-switching back
+                        router.replace('/messages', { scroll: false });
+                      }}
                       className={`flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-colors ${
                         activeConversation === conversation.id
                           ? "bg-muted"
@@ -472,7 +486,10 @@ function MessagesContent() {
                     {/* Messages - Scrollable area */}
                     <div className="flex-1 overflow-y-auto overflow-x-visible p-4 min-h-0 bg-muted/10 relative">
                       <div className="space-y-4 max-w-3xl mx-auto w-full">
-                      {messages.map((msg, idx) => (
+                      {messages.map((msg, idx) => {
+                        const isNearBottom = idx >= messages.length - 3;
+                        const isNearTop = idx < 2;
+                        return (
                         <div
                           key={msg.id}
                           className={`flex gap-3 ${msg.isMe ? "justify-end" : ""} group`}
@@ -495,7 +512,7 @@ function MessagesContent() {
                                 <p className="text-sm">{msg.message}</p>
                               </div>
 
-                              {!msg.isMe && userRole === "THERAPIST" && msg.analysis && (
+                              {!msg.isMe && userRole === "THERAPIST" && (
                                 <div className="relative group/insight">
                                   <Button
                                     size="icon"
@@ -503,25 +520,26 @@ function MessagesContent() {
                                     className="h-7 w-7 p-0 border bg-background/80 hover:bg-background"
                                     aria-label="Message analysis"
                                   >
-                                    <BarChart3 className={`h-3.5 w-3.5 ${getRiskColor(msg.analysis.riskLevel)}`} />
+                                    <BarChart3 className={`h-3.5 w-3.5 ${msg.analysis ? getRiskColor(msg.analysis.riskLevel) : 'text-muted-foreground'}`} />
                                   </Button>
-                                  <div className="pointer-events-none absolute left-full top-0 ml-2 hidden w-72 rounded-lg border bg-card p-3 shadow-lg group-hover/insight:block z-30">
-                                    <p className="text-xs font-semibold mb-2">Message Analysis</p>
-                                    <div className="text-xs text-muted-foreground space-y-2">
-                                      <p className="flex items-center gap-2">
-                                        <span className={`h-2.5 w-2.5 rounded-full ${getRiskBgColor(msg.analysis.riskLevel)}`}></span>
-                                        <span className="font-medium">Label:</span> {msg.analysis.label}
-                                      </p>
-                                      <p className="flex items-center gap-2">
-                                        <span className="h-2.5 w-2.5 rounded-full bg-blue-400"></span>
-                                        <span className="font-medium">Confidence:</span> {(msg.analysis.confidence * 100).toFixed(0)}%
-                                      </p>
-                                      <p className="flex items-center gap-2">
-                                        <span className={`h-2.5 w-2.5 rounded-full ${getRiskBgColor(msg.analysis.riskLevel)}`}></span>
-                                        <span className="font-medium">Risk Level:</span> {msg.analysis.riskLevel}
-                                      </p>
-                                    </div>
-                                    {msg.analysis.psychometrics && (
+                                  {msg.analysis ? (
+                                    <div className={`pointer-events-none absolute left-0 ${isNearTop ? 'top-full mt-2' : 'bottom-full mb-2'} hidden w-72 rounded-lg border bg-card p-3 shadow-lg group-hover/insight:block z-30`}>
+                                      <p className="text-xs font-semibold mb-2">Message Analysis</p>
+                                      <div className="text-xs text-muted-foreground space-y-2">
+                                        <p className="flex items-center gap-2">
+                                          <span className={`h-2.5 w-2.5 rounded-full ${getRiskBgColor(msg.analysis.riskLevel)}`}></span>
+                                          <span className="font-medium">Label:</span> {msg.analysis.label}
+                                        </p>
+                                        <p className="flex items-center gap-2">
+                                          <span className="h-2.5 w-2.5 rounded-full bg-blue-400"></span>
+                                          <span className="font-medium">Confidence:</span> {(msg.analysis.confidence * 100).toFixed(0)}%
+                                        </p>
+                                        <p className="flex items-center gap-2">
+                                          <span className={`h-2.5 w-2.5 rounded-full ${getRiskBgColor(msg.analysis.riskLevel)}`}></span>
+                                          <span className="font-medium">Risk Level:</span> {msg.analysis.riskLevel}
+                                        </p>
+                                      </div>
+                                      {msg.analysis.psychometrics && (
                                       <>
                                         <div className="border-t mt-2 pt-2">
                                           <p className="text-xs font-semibold mb-2">Psychometric Scores</p>
@@ -579,6 +597,12 @@ function MessagesContent() {
                                       </>
                                     )}
                                   </div>
+                                ) : (
+                                  <div className={`pointer-events-none absolute left-0 ${isNearTop ? 'top-full mt-2' : 'bottom-full mb-2'} hidden w-56 rounded-lg border bg-card p-3 shadow-lg group-hover/insight:block z-30`}>
+                                    <p className="text-xs font-semibold mb-1">Message Analysis</p>
+                                    <p className="text-xs text-muted-foreground">No analysis available for this message yet.</p>
+                                  </div>
+                                )}
                                 </div>
                               )}
 
@@ -671,7 +695,8 @@ function MessagesContent() {
                             </Avatar>
                           )}
                         </div>
-                      ))}
+                      );
+                      })}
 
                       {isTyping && (
                         <div className="flex gap-3 justify-start animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -706,6 +731,7 @@ function MessagesContent() {
                             </div>
                           </div>
                         )}
+                        <div ref={messagesEndRef} />
                       </div>
                     </div>
 
