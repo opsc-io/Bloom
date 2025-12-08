@@ -454,7 +454,7 @@ function MessagesContent() {
                                 <p className="text-sm">{msg.message}</p>
                               </div>
 
-                              {!msg.isMe && userRole === "practitioner" && (
+                              {!msg.isMe && userRole === "THERAPIST" && (
                                 <div className="relative group/insight">
                                   <Button
                                     size="icon"

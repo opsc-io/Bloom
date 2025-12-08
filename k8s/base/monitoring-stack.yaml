@@ -229,16 +229,42 @@ data:
       - job_name: kubernetes-pods
         kubernetes_sd_configs:
           - role: pod
+        pipeline_stages:
+          - cri: {}
         relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_label_app]
+          # CRITICAL: Set __host__ from pod node name for Kubernetes SD
+          # Promtail validates this matches its own hostname
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: __host__
+          # Keep all pods in bloom-* namespaces
+          - source_labels: [__meta_kubernetes_namespace]
             regex: bloom-.*
             action: keep
+          # Drop if no container name (init containers)
+          - source_labels: [__meta_kubernetes_pod_container_name]
+            action: drop
+            regex: ''
+          # Set pod name label
           - source_labels: [__meta_kubernetes_pod_name]
             target_label: pod
+          # Set namespace label
           - source_labels: [__meta_kubernetes_namespace]
             target_label: namespace
+          # Set container label
           - source_labels: [__meta_kubernetes_pod_container_name]
             target_label: container
+          # Set app label
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            target_label: app
+          # Set node label
+          - source_labels: [__meta_kubernetes_pod_node_name]
+            target_label: node
+          # Build the log file path: /var/log/pods/<namespace>_<pod-name>_<pod-uid>/<container-name>/*.log
+          - source_labels: [__meta_kubernetes_namespace, __meta_kubernetes_pod_name, __meta_kubernetes_pod_uid, __meta_kubernetes_pod_container_name]
+            separator: ;
+            regex: (.*);(.*);(.*);(.*)
+            target_label: __path__
+            replacement: /var/log/pods/${1}_${2}_${3}/${4}/*.log
 ---
 apiVersion: apps/v1
 kind: DaemonSet
@@ -259,26 +285,41 @@ spec:
           image: grafana/promtail:2.9.2
           args:
             - '-config.file=/etc/promtail/promtail.yml'
+          env:
+            - name: HOSTNAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+          securityContext:
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+            allowPrivilegeEscalation: false
           volumeMounts:
             - name: config
               mountPath: /etc/promtail
             - name: varlog
-              mountPath: /var/log
+              mountPath: /var/log/pods
               readOnly: true
+            - name: positions
+              mountPath: /tmp
           resources:
             requests:
               cpu: "10m"
-              memory: "32Mi"
-            limits:
-              cpu: "50m"
               memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
       volumes:
         - name: config
           configMap:
             name: promtail-config
         - name: varlog
           hostPath:
-            path: /var/log
+            path: /var/log/pods
+        - name: positions
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -301,7 +342,7 @@ metadata:
 subjects:
   - kind: ServiceAccount
     name: promtail
-    namespace: bloom
+    # namespace is set by kustomize overlay (bloom-dev, bloom-qa, bloom-prod)
 roleRef:
   kind: ClusterRole
   name: promtail
