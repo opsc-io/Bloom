@@ -19,6 +19,22 @@ const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 const pub = new Redis(REDIS_URL);
 const sub = new Redis(REDIS_URL);
 
+// Log Redis connection status
+pub.on("connect", () => console.log("[Redis] Publisher connected to:", REDIS_URL));
+pub.on("ready", () => console.log("[Redis] Publisher ready"));
+pub.on("error", (err) => console.error("[Redis] Publisher error:", err));
+pub.on("close", () => console.log("[Redis] Publisher connection closed"));
+
+sub.on("connect", () => console.log("[Redis] Subscriber connected to:", REDIS_URL));
+sub.on("ready", () => console.log("[Redis] Subscriber ready"));
+sub.on("error", (err) => console.error("[Redis] Subscriber error:", err));
+sub.on("close", () => console.log("[Redis] Subscriber connection closed"));
+
+// Log when psubscribe succeeds
+sub.on("psubscribe", (pattern, count) => {
+  console.log(`[Redis] Subscribed to pattern: ${pattern}, total subscriptions: ${count}`);
+});
+
 type TypingPayload = {
   conversationId: string;
   userId: string;
@@ -95,9 +111,11 @@ async function main() {
   // Subscribe to typing, message, and reaction events
   sub.psubscribe("typing:*", "message:*", "reaction:*");
   sub.on("pmessage", (_pattern, channel, message) => {
+    console.log(`[Redis] Received pmessage on channel: ${channel}`);
     try {
       if (channel.startsWith("typing:")) {
         const payload: TypingPayload = JSON.parse(message);
+        console.log(`[Socket] Broadcasting typing to room ${payload.conversationId} from user ${payload.userId}`);
         io.to(payload.conversationId).emit("typing", payload);
       } else if (channel.startsWith("message:")) {
         const payload: MessagePayload = JSON.parse(message);
@@ -128,12 +146,19 @@ async function main() {
     const userId: string = authSocket.userId;
     const name: string | undefined = authSocket.userName;
 
+    console.log(`[Socket] New connection: user=${userId} name=${name} socketId=${socket.id}`);
+
     try {
       const convIds = await userConversationIds(userId);
+      console.log(`[Socket] User ${userId} joining ${convIds.length} rooms:`, convIds);
       convIds.forEach((id) => socket.join(id));
     } catch (err) {
       console.error("Failed to join rooms", err);
     }
+
+    socket.on("disconnect", (reason) => {
+      console.log(`[Socket] Disconnected: user=${userId} socketId=${socket.id} reason=${reason}`);
+    });
 
     socket.on("join", async ({ conversationId }: { conversationId?: string }) => {
       if (!conversationId) return;
@@ -143,15 +168,23 @@ async function main() {
     });
 
     socket.on("typing", async ({ conversationId }: { conversationId?: string }) => {
-      if (!conversationId) return;
+      console.log(`[Socket] Received typing event from user ${userId} for conversation ${conversationId}`);
+      if (!conversationId) {
+        console.log("[Socket] No conversationId provided, ignoring typing event");
+        return;
+      }
       const isParticipant = await userIsParticipant(userId, conversationId);
-      if (!isParticipant) return;
+      if (!isParticipant) {
+        console.log(`[Socket] User ${userId} is not a participant in conversation ${conversationId}`);
+        return;
+      }
       const payload: TypingPayload = {
         conversationId,
         userId,
         name,
         expiresAt: Date.now() + 3000,
       };
+      console.log(`[Redis] Publishing typing event to typing:${conversationId}`);
       pub.publish(`typing:${conversationId}`, JSON.stringify(payload));
     });
   });
