@@ -3,7 +3,6 @@ node_modules
 .git
 *.log
 .env*.local
-.vercel
 .DS_Store
 coverage
 .nyc_output

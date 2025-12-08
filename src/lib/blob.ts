@@ -1,11 +1,11 @@
 /**
- * Vercel Blob Upload Utilities
+ * Google Cloud Storage Upload Utilities
  *
  * Usage in components:
  *
  * // Upload a file
  * const result = await uploadFile(file, 'avatars')
- * console.log(result.url) // https://oozfaovsgf7fxajz.public.blob.vercel-storage.com/avatars/image.png
+ * console.log(result.url) // https://storage.googleapis.com/bloom-uploads/avatars/image.png
  *
  * // Delete a file
  * await deleteFile(result.url)

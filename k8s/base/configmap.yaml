@@ -6,6 +6,8 @@ metadata:
 data:
   NODE_ENV: "production"
   SOCKET_PORT: "4000"
+  # Auth configuration
+  BETTER_AUTH_URL: "https://bloomhealth.us"
   # Self-hosted services (in-cluster)
   REDIS_URL: "redis://redis:6379"
   DATABASE_URL: "postgresql://root@cockroachdb:26257/bloom?sslmode=disable"

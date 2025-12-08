@@ -7,8 +7,7 @@ const GRAFANA_URL = "https://opscvisuals.grafana.net";
 
 // Get the appropriate token and dashboard based on environment
 const getGrafanaConfig = () => {
-  const isProduction = process.env.VERCEL_ENV === "production" ||
-    process.env.NODE_ENV === "production";
+  const isProduction = process.env.NODE_ENV === "production";
 
   return {
     token: isProduction

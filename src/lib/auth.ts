@@ -36,13 +36,10 @@ async function sendEmail(options: {
   })
 }
 
-// Handle dynamic Vercel URLs for preview deployments
+// Get the base URL from environment
 const getBaseURL = () => {
   if (process.env.BETTER_AUTH_URL) {
     return process.env.BETTER_AUTH_URL
-  }
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`
   }
   return 'http://localhost:3000'
 }
@@ -59,7 +56,10 @@ export const auth = betterAuth({
     'https://bloomhealth.us',
     'https://www.bloomhealth.us',
     'https://qa.bloomhealth.us',
-    process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : '',
+    'https://qa.gcp.bloomhealth.us',
+    'https://dev.gcp.bloomhealth.us',
+    'https://prod.gcp.bloomhealth.us',
+    process.env.BETTER_AUTH_URL || '',
   ].filter(Boolean),
   emailAndPassword: {
     enabled: true,

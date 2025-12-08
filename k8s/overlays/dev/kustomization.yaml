@@ -96,6 +96,9 @@ patches:
       - op: replace
         path: /data/NODE_ENV
         value: "development"
+      - op: replace
+        path: /data/BETTER_AUTH_URL
+        value: "https://dev.gcp.bloomhealth.us"
 
   # HPA - App
   - target:
