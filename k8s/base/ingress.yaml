@@ -6,6 +6,9 @@ kind: ServiceAccount
 metadata:
   name: bloom-sa
   namespace: bloom
+  annotations:
+    # Workload Identity - allows this K8s SA to impersonate the GCP SA
+    iam.gke.io/gcp-service-account: bloom-app-sa@project-4fc52960-1177-49ec-a6f.iam.gserviceaccount.com
 ---
 # Managed Certificate for automatic SSL
 apiVersion: networking.gke.io/v1
