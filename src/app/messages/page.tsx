@@ -168,7 +168,8 @@ function MessagesContent() {
 
   useEffect(() => {
     if (isPending || !session?.user) return;
-    const url = process.env.NEXT_PUBLIC_SOCKET_URL || "http://localhost:4000";
+    // Socket connects to same origin as app (via /socket.io/* path in ingress)
+    const url = typeof window !== "undefined" ? window.location.origin : "http://localhost:4000";
     const socket = io(url, {
       withCredentials: true,
       auth: {
