@@ -53,6 +53,13 @@ type Message = {
     label: string;
     confidence: number;
     riskLevel: string;
+    psychometrics?: {
+      sentiment: number;
+      trauma: number;
+      isolation: number;
+      support: number;
+      familyHistoryProb: number;
+    };
   };
 };
 
@@ -498,12 +505,12 @@ function MessagesContent() {
                                   >
                                     <BarChart3 className={`h-3.5 w-3.5 ${getRiskColor(msg.analysis.riskLevel)}`} />
                                   </Button>
-                                  <div className="pointer-events-none absolute left-full top-0 ml-2 hidden w-56 rounded-lg border bg-card p-3 shadow-lg group-hover/insight:block z-30">
+                                  <div className="pointer-events-none absolute left-full top-0 ml-2 hidden w-72 rounded-lg border bg-card p-3 shadow-lg group-hover/insight:block z-30">
                                     <p className="text-xs font-semibold mb-2">Message Analysis</p>
                                     <div className="text-xs text-muted-foreground space-y-2">
                                       <p className="flex items-center gap-2">
                                         <span className={`h-2.5 w-2.5 rounded-full ${getRiskBgColor(msg.analysis.riskLevel)}`}></span>
-                                        <span className="font-medium">Sentiment:</span> {msg.analysis.label}
+                                        <span className="font-medium">Label:</span> {msg.analysis.label}
                                       </p>
                                       <p className="flex items-center gap-2">
                                         <span className="h-2.5 w-2.5 rounded-full bg-blue-400"></span>
@@ -514,6 +521,63 @@ function MessagesContent() {
                                         <span className="font-medium">Risk Level:</span> {msg.analysis.riskLevel}
                                       </p>
                                     </div>
+                                    {msg.analysis.psychometrics && (
+                                      <>
+                                        <div className="border-t mt-2 pt-2">
+                                          <p className="text-xs font-semibold mb-2">Psychometric Scores</p>
+                                          <div className="space-y-1.5">
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-xs text-muted-foreground">Sentiment</span>
+                                              <div className="flex items-center gap-2">
+                                                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                  <div
+                                                    className={`h-full rounded-full ${msg.analysis.psychometrics.sentiment < 0 ? 'bg-red-500' : 'bg-green-500'}`}
+                                                    style={{ width: `${Math.abs(msg.analysis.psychometrics.sentiment) * 100}%`, marginLeft: msg.analysis.psychometrics.sentiment < 0 ? 'auto' : 0 }}
+                                                  />
+                                                </div>
+                                                <span className="text-xs w-10 text-right">{msg.analysis.psychometrics.sentiment.toFixed(2)}</span>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-xs text-muted-foreground">Trauma</span>
+                                              <div className="flex items-center gap-2">
+                                                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                  <div className="h-full bg-orange-500 rounded-full" style={{ width: `${Math.min(msg.analysis.psychometrics.trauma * 100, 100)}%` }} />
+                                                </div>
+                                                <span className="text-xs w-10 text-right">{msg.analysis.psychometrics.trauma.toFixed(2)}</span>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-xs text-muted-foreground">Isolation</span>
+                                              <div className="flex items-center gap-2">
+                                                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                  <div className="h-full bg-purple-500 rounded-full" style={{ width: `${Math.min(msg.analysis.psychometrics.isolation * 100, 100)}%` }} />
+                                                </div>
+                                                <span className="text-xs w-10 text-right">{msg.analysis.psychometrics.isolation.toFixed(2)}</span>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-xs text-muted-foreground">Support</span>
+                                              <div className="flex items-center gap-2">
+                                                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(msg.analysis.psychometrics.support * 100, 100)}%` }} />
+                                                </div>
+                                                <span className="text-xs w-10 text-right">{msg.analysis.psychometrics.support.toFixed(2)}</span>
+                                              </div>
+                                            </div>
+                                            <div className="flex items-center justify-between">
+                                              <span className="text-xs text-muted-foreground">Family History</span>
+                                              <div className="flex items-center gap-2">
+                                                <div className="w-16 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                  <div className="h-full bg-amber-500 rounded-full" style={{ width: `${msg.analysis.psychometrics.familyHistoryProb * 100}%` }} />
+                                                </div>
+                                                <span className="text-xs w-10 text-right">{(msg.analysis.psychometrics.familyHistoryProb * 100).toFixed(0)}%</span>
+                                              </div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </>
+                                    )}
                                   </div>
                                 </div>
                               )}

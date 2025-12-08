@@ -112,19 +112,31 @@ export async function GET(req: Request) {
       }
     );
 
-    // For therapists, fetch analysis data for all messages
-    let analysisMap: Map<string, { label: string; confidence: number; riskLevel: string }> = new Map();
+    // For therapists, fetch analysis data for all messages (including psychometrics)
+    let analysisMap: Map<string, {
+      label: string;
+      confidence: number;
+      riskLevel: string;
+      psychometrics?: {
+        sentiment: number;
+        trauma: number;
+        isolation: number;
+        support: number;
+        familyHistoryProb: number;
+      };
+    }> = new Map();
     if (isTherapist && messages.length > 0) {
       const messageIds = messages.map((m) => m.id);
       const analyses = await prisma.messageAnalysis.findMany({
         where: { messageId: { in: messageIds } },
-        select: { messageId: true, label: true, confidence: true, riskLevel: true },
+        select: { messageId: true, label: true, confidence: true, riskLevel: true, psychometrics: true },
       });
       analyses.forEach((a) => {
         analysisMap.set(a.messageId, {
           label: a.label,
           confidence: a.confidence,
           riskLevel: a.riskLevel,
+          psychometrics: a.psychometrics as { sentiment: number; trauma: number; isolation: number; support: number; familyHistoryProb: number } | undefined,
         });
       });
     }
@@ -312,7 +324,7 @@ export async function POST(req: Request) {
     console.log("[ML] Prediction result:", JSON.stringify(prediction));
     const riskLevel = getRiskLevel(prediction);
 
-    // Store analysis in database
+    // Store analysis in database with psychometrics
     await prisma.messageAnalysis.create({
       data: {
         messageId: createdMessage.id,
@@ -320,10 +332,17 @@ export async function POST(req: Request) {
         confidence: prediction.confidence,
         riskLevel,
         allScores: prediction.allScores ?? {},
+        psychometrics: prediction.psychometrics ? {
+          sentiment: prediction.psychometrics.sentiment,
+          trauma: prediction.psychometrics.trauma,
+          isolation: prediction.psychometrics.isolation,
+          support: prediction.psychometrics.support,
+          familyHistoryProb: prediction.psychometrics.familyHistoryProb,
+        } : undefined,
         modelVersion: USE_MOCK_ML ? "mock-v1" : "vertex-ai-v2",
       },
     });
-    console.log("[ML] Analysis stored in database");
+    console.log("[ML] Analysis stored in database with psychometrics:", prediction.psychometrics);
 
     analysisResult = {
       label: prediction.label,
