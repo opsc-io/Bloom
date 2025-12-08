@@ -132,10 +132,13 @@ async function main() {
   });
 
   io.use(async (socket, next) => {
+    console.log(`[Socket] Auth middleware: attempting to authenticate socketId=${socket.id}`);
     const session = await getSessionFromSocket(socket);
     if (!session?.user?.id) {
+      console.log(`[Socket] Auth middleware: REJECTED socketId=${socket.id} - no valid session`);
       return next(new Error("unauthorized"));
     }
+    console.log(`[Socket] Auth middleware: ACCEPTED socketId=${socket.id} userId=${session.user.id}`);
     (socket as AuthenticatedSocket).userId = session.user.id;
     (socket as AuthenticatedSocket).userName = session.user.name ?? undefined;
     next();
