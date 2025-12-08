@@ -526,7 +526,7 @@ Development (dev branch) → QA (qa branch) → Production (main branch)
 - [Load Testing Documentation](../load-tests/README.md) - Performance testing and SLO targets
 - [Contributing Guidelines](../CONTRIBUTING.md) - Development workflow and coding standards
 - [Architecture Diagram](../README.md#architecture) - System architecture overview
-- [Deployment Workflow](../README.md#cicd-pipeline) - CI/CD pipeline and deployment process
+- [Deployment Documentation](../README.md#deployment) - CI/CD pipeline and deployment process
 
 ---
 
