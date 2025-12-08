@@ -3,7 +3,7 @@
  * Tests the mental health classification utilities
  */
 
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   isHighRisk,
   getRiskLevel,
@@ -34,6 +34,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Suicidal",
         confidence: 0.85,
+        riskLevel: "high",
       };
       expect(isHighRisk(prediction)).toBe(true);
     });
@@ -42,6 +43,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Depression",
         confidence: 0.9,
+        riskLevel: "high",
       };
       expect(isHighRisk(prediction)).toBe(true);
     });
@@ -50,6 +52,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Suicidal",
         confidence: 0.5,
+        riskLevel: "medium",
       };
       expect(isHighRisk(prediction)).toBe(false);
     });
@@ -58,6 +61,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Normal",
         confidence: 0.95,
+        riskLevel: "normal",
       };
       expect(isHighRisk(prediction)).toBe(false);
     });
@@ -66,6 +70,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Anxiety",
         confidence: 0.9,
+        riskLevel: "medium",
       };
       expect(isHighRisk(prediction)).toBe(false);
     });
@@ -76,6 +81,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Suicidal",
         confidence: 0.6,
+        riskLevel: "high",
       };
       expect(getRiskLevel(prediction)).toBe("high");
     });
@@ -84,6 +90,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Depression",
         confidence: 0.8,
+        riskLevel: "high",
       };
       expect(getRiskLevel(prediction)).toBe("high");
     });
@@ -92,6 +99,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Depression",
         confidence: 0.6,
+        riskLevel: "medium",
       };
       expect(getRiskLevel(prediction)).toBe("medium");
     });
@@ -100,6 +108,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Anxiety",
         confidence: 0.7,
+        riskLevel: "medium",
       };
       expect(getRiskLevel(prediction)).toBe("medium");
     });
@@ -108,6 +117,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Bipolar",
         confidence: 0.6,
+        riskLevel: "medium",
       };
       expect(getRiskLevel(prediction)).toBe("medium");
     });
@@ -116,6 +126,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Normal",
         confidence: 0.9,
+        riskLevel: "normal",
       };
       expect(getRiskLevel(prediction)).toBe("normal");
     });
@@ -124,6 +135,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Stress",
         confidence: 0.8,
+        riskLevel: "low",
       };
       expect(getRiskLevel(prediction)).toBe("low");
     });
@@ -132,6 +144,7 @@ describe("ML Inference Client", () => {
       const prediction: PredictionResult = {
         label: "Personality disorder",
         confidence: 0.4,
+        riskLevel: "low",
       };
       expect(getRiskLevel(prediction)).toBe("low");
     });
@@ -153,6 +166,7 @@ describe("ML Inference Client", () => {
         const prediction: PredictionResult = {
           label,
           confidence: 0.5,
+          riskLevel: "low",
         };
         expect(prediction.label).toBe(label);
       });
