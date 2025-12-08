@@ -8,6 +8,7 @@ import { auth } from "../src/lib/auth";
 interface AuthenticatedSocket extends Socket {
   userId: string;
   userName?: string;
+  userRole?: string;
 }
 
 const SOCKET_PORT = Number(process.env.SOCKET_PORT || 4000);
@@ -62,6 +63,16 @@ type ReactionPayload = {
   reactions: { emoji: string; count: number }[];
 };
 
+type AnalysisPayload = {
+  conversationId: string;
+  messageId: string;
+  analysis: {
+    label: string;
+    confidence: number;
+    riskLevel: string;
+  };
+};
+
 async function getSessionFromSocket(socket: Socket) {
   const headers = new Headers();
   const cookie = socket.handshake?.headers?.cookie;
@@ -108,8 +119,8 @@ async function main() {
     },
   });
 
-  // Subscribe to typing, message, and reaction events
-  sub.psubscribe("typing:*", "message:*", "reaction:*");
+  // Subscribe to typing, message, reaction, and analysis events
+  sub.psubscribe("typing:*", "message:*", "reaction:*", "analysis:*");
   sub.on("pmessage", (_pattern, channel, message) => {
     console.log(`[Redis] Received pmessage on channel: ${channel}`);
     try {
@@ -125,6 +136,24 @@ async function main() {
         const payload: ReactionPayload = JSON.parse(message);
         io.to(payload.conversationId).emit("reactionUpdate", payload);
         console.log(`[Socket] Broadcasting reactionUpdate to room ${payload.conversationId}`);
+      } else if (channel.startsWith("analysis:")) {
+        // Analysis events are only sent to therapists
+        const payload: AnalysisPayload = JSON.parse(message);
+        const room = payload.conversationId;
+
+        // Get sockets in room and only emit to therapists
+        const socketsInRoom = io.sockets.adapter.rooms.get(room);
+        if (socketsInRoom) {
+          let therapistCount = 0;
+          for (const socketId of socketsInRoom) {
+            const socket = io.sockets.sockets.get(socketId) as AuthenticatedSocket;
+            if (socket?.userRole === "THERAPIST") {
+              socket.emit("analysisUpdate", payload);
+              therapistCount++;
+            }
+          }
+          console.log(`[Socket] Analysis sent to ${therapistCount} therapist(s) in room ${room}`);
+        }
       }
     } catch (err) {
       console.error("Failed to parse message", err);
@@ -138,9 +167,17 @@ async function main() {
       console.log(`[Socket] Auth middleware: REJECTED socketId=${socket.id} - no valid session`);
       return next(new Error("unauthorized"));
     }
-    console.log(`[Socket] Auth middleware: ACCEPTED socketId=${socket.id} userId=${session.user.id}`);
+
+    // Fetch user role from database
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    console.log(`[Socket] Auth middleware: ACCEPTED socketId=${socket.id} userId=${session.user.id} role=${user?.role}`);
     (socket as AuthenticatedSocket).userId = session.user.id;
     (socket as AuthenticatedSocket).userName = session.user.name ?? undefined;
+    (socket as AuthenticatedSocket).userRole = user?.role ?? undefined;
     next();
   });
 

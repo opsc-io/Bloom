@@ -8,6 +8,7 @@ import redis, {
   CACHE_KEYS,
   CACHE_TTL,
 } from "@/lib/redis";
+import { analyzeText, getRiskLevel, USE_MOCK_ML } from "@/lib/ml-inference";
 
 const colorPool = ["bg-blue-500", "bg-purple-500", "bg-green-500", "bg-amber-500", "bg-pink-500", "bg-indigo-500"];
 
@@ -32,6 +33,8 @@ export async function GET(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const userId = session.user.id;
+  const userRole = (session.user as { role?: string }).role;
+  const isTherapist = userRole === "THERAPIST";
   const searchParams = new URL(req.url).searchParams;
   const requestedConversationId = searchParams.get("conversationId");
 
@@ -95,6 +98,7 @@ export async function GET(req: Request) {
 
   if (activeConversationId) {
     // Fetch messages with Redis caching
+    // Note: For therapists, we need to fetch analysis separately (can't cache role-specific includes)
     const messages = await getCachedOrFetch(
       CACHE_KEYS.conversationMessages(activeConversationId),
       CACHE_TTL.messages,
@@ -108,6 +112,23 @@ export async function GET(req: Request) {
       }
     );
 
+    // For therapists, fetch analysis data for all messages
+    let analysisMap: Map<string, { label: string; confidence: number; riskLevel: string }> = new Map();
+    if (isTherapist && messages.length > 0) {
+      const messageIds = messages.map((m) => m.id);
+      const analyses = await prisma.messageAnalysis.findMany({
+        where: { messageId: { in: messageIds } },
+        select: { messageId: true, label: true, confidence: true, riskLevel: true },
+      });
+      analyses.forEach((a) => {
+        analysisMap.set(a.messageId, {
+          label: a.label,
+          confidence: a.confidence,
+          riskLevel: a.riskLevel,
+        });
+      });
+    }
+
     mappedMessages = messages.map((msg) => {
       const reactionCounts = Object.values(
         (msg.reactions ?? []).reduce<Record<string, { emoji: string; count: number }>>((acc, r) => {
@@ -115,6 +136,8 @@ export async function GET(req: Request) {
           return acc;
         }, {})
       );
+
+      const analysis = isTherapist ? analysisMap.get(msg.id) : undefined;
 
       return {
         id: msg.id,
@@ -129,6 +152,8 @@ export async function GET(req: Request) {
         avatarColor: pickColor(msg.senderId),
         image: msg.sender.image ?? null,
         reactions: reactionCounts,
+        // Only include analysis for therapists
+        ...(analysis && { analysis }),
       };
     });
   }
@@ -278,6 +303,49 @@ export async function POST(req: Request) {
       body: messageText,
     },
   });
+
+  // Analyze message for sentiment (async, don't block message send)
+  let analysisResult: { label: string; confidence: number; riskLevel: string } | null = null;
+  console.log("[ML] Starting analysis for message:", createdMessage.id, "USE_MOCK_ML:", USE_MOCK_ML);
+  try {
+    const prediction = await analyzeText(messageText, true);
+    console.log("[ML] Prediction result:", JSON.stringify(prediction));
+    const riskLevel = getRiskLevel(prediction);
+
+    // Store analysis in database
+    await prisma.messageAnalysis.create({
+      data: {
+        messageId: createdMessage.id,
+        label: prediction.label,
+        confidence: prediction.confidence,
+        riskLevel,
+        allScores: prediction.allScores ?? {},
+        modelVersion: USE_MOCK_ML ? "mock-v1" : "vertex-ai-v2",
+      },
+    });
+    console.log("[ML] Analysis stored in database");
+
+    analysisResult = {
+      label: prediction.label,
+      confidence: prediction.confidence,
+      riskLevel,
+    };
+
+    // Publish analysis to Redis for real-time display to therapists
+    await redis.publish(
+      `analysis:${targetConversationId}`,
+      JSON.stringify({
+        conversationId: targetConversationId,
+        messageId: createdMessage.id,
+        analysis: analysisResult,
+      })
+    );
+    console.log("[ML] Analysis published to Redis");
+  } catch (err) {
+    console.error("[ML] Analysis failed:", err instanceof Error ? err.message : String(err));
+    console.error("[ML] Full error:", err);
+    // Don't block message send if ML analysis fails
+  }
 
   // Update last message timestamp
   await prisma.conversation.update({

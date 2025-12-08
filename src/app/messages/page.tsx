@@ -49,7 +49,31 @@ type Message = {
   avatarColor: string;
   image?: string | null;
   reactions?: { emoji: string; count: number }[];
+  analysis?: {
+    label: string;
+    confidence: number;
+    riskLevel: string;
+  };
 };
+
+// Helper functions for risk level colors
+function getRiskColor(riskLevel: string): string {
+  switch (riskLevel) {
+    case "high": return "text-red-500";
+    case "medium": return "text-yellow-500";
+    case "low": return "text-blue-500";
+    default: return "text-green-500";
+  }
+}
+
+function getRiskBgColor(riskLevel: string): string {
+  switch (riskLevel) {
+    case "high": return "bg-red-500";
+    case "medium": return "bg-yellow-500";
+    case "low": return "bg-blue-500";
+    default: return "bg-green-500";
+  }
+}
 
 
 function MessagesContent() {
@@ -211,6 +235,15 @@ function MessagesContent() {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === payload.messageId ? { ...msg, reactions: payload.reactions } : msg
+        )
+      );
+    });
+
+    // Listen for analysis updates (therapists only receive these)
+    socket.on("analysisUpdate", (payload: { conversationId: string; messageId: string; analysis: { label: string; confidence: number; riskLevel: string } }) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === payload.messageId ? { ...msg, analysis: payload.analysis } : msg
         )
       );
     });
@@ -455,34 +488,30 @@ function MessagesContent() {
                                 <p className="text-sm">{msg.message}</p>
                               </div>
 
-                              {!msg.isMe && userRole === "THERAPIST" && (
+                              {!msg.isMe && userRole === "THERAPIST" && msg.analysis && (
                                 <div className="relative group/insight">
                                   <Button
                                     size="icon"
                                     variant="ghost"
                                     className="h-7 w-7 p-0 border bg-background/80 hover:bg-background"
-                                    aria-label="Patient insights"
+                                    aria-label="Message analysis"
                                   >
-                                    <BarChart3 className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <BarChart3 className={`h-3.5 w-3.5 ${getRiskColor(msg.analysis.riskLevel)}`} />
                                   </Button>
                                   <div className="pointer-events-none absolute left-full top-0 ml-2 hidden w-56 rounded-lg border bg-card p-3 shadow-lg group-hover/insight:block z-30">
-                                    <p className="text-xs font-semibold mb-1">Patient snapshot</p>
-                                    <div className="text-xs text-muted-foreground space-y-1">
+                                    <p className="text-xs font-semibold mb-2">Message Analysis</p>
+                                    <div className="text-xs text-muted-foreground space-y-2">
                                       <p className="flex items-center gap-2">
-                                        <span className="h-2.5 w-2.5 rounded-full bg-green-500"></span>
-                                        Mood trend: steady ↑
+                                        <span className={`h-2.5 w-2.5 rounded-full ${getRiskBgColor(msg.analysis.riskLevel)}`}></span>
+                                        <span className="font-medium">Sentiment:</span> {msg.analysis.label}
                                       </p>
                                       <p className="flex items-center gap-2">
-                                        <span className="h-2.5 w-2.5 rounded-full bg-green-400"></span>
-                                        Sleep: improving (6.8h avg)
+                                        <span className="h-2.5 w-2.5 rounded-full bg-blue-400"></span>
+                                        <span className="font-medium">Confidence:</span> {(msg.analysis.confidence * 100).toFixed(0)}%
                                       </p>
                                       <p className="flex items-center gap-2">
-                                        <span className="h-2.5 w-2.5 rounded-full bg-yellow-400"></span>
-                                        Check-ins this week: 3
-                                      </p>
-                                      <p className="flex items-center gap-2">
-                                        <span className="h-2.5 w-2.5 rounded-full bg-red-400"></span>
-                                        Next step: reinforce evening routine
+                                        <span className={`h-2.5 w-2.5 rounded-full ${getRiskBgColor(msg.analysis.riskLevel)}`}></span>
+                                        <span className="font-medium">Risk Level:</span> {msg.analysis.riskLevel}
                                       </p>
                                     </div>
                                   </div>

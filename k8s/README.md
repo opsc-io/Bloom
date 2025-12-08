@@ -30,11 +30,13 @@ k8s/
 
 ## Environments
 
-| Environment | Domain | Cluster | Namespace |
-|-------------|--------|---------|-----------|
-| DEV | dev.gcp.bloomhealth.us | bloom-dev-cluster | bloom-dev |
-| QA | qa.gcp.bloomhealth.us | bloom-qa-cluster | bloom-qa |
-| PROD | bloomhealth.us | bloom-prod-cluster | bloom-prod |
+| Environment | Domain | Cluster | Region | Namespace |
+|-------------|--------|---------|--------|-----------|
+| DEV | dev.gcp.bloomhealth.us | bloom-dev-autopilot | us-west1 | bloom-dev |
+| QA | qa.gcp.bloomhealth.us | bloom-qa-cluster | us-central1 | bloom-qa |
+| PROD | bloomhealth.us | bloom-prod-autopilot | us-east1 | bloom-prod |
+
+> **Note**: DEV and PROD use GKE Autopilot clusters for cost-efficiency and simplified operations.
 
 ## Components
 
@@ -50,6 +52,50 @@ k8s/
 - **Promtail**: Log collection agent (DaemonSet)
 - **Grafana**: Visualization dashboards (port 3000, path `/grafana/`)
 - **Redis Exporter**: Redis metrics exporter (port 9121)
+
+## Real-Time Messaging
+
+The application uses Socket.io with Redis pub/sub for real-time features like typing indicators and message delivery.
+
+### Architecture
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Client    │────▶│ bloom-socket│────▶│    Redis    │
+│  (Browser)  │◀────│  (Socket.io)│◀────│  (Pub/Sub)  │
+└─────────────┘     └─────────────┘     └─────────────┘
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │  bloom-app  │
+                    │  (Next.js)  │
+                    └─────────────┘
+```
+
+### Redis Pub/Sub Channels
+
+| Channel Pattern | Purpose |
+|-----------------|---------|
+| `typing:*` | Typing indicator events |
+| `message:*` | New message delivery |
+| `reaction:*` | Message reaction updates |
+
+### CORS Configuration
+
+Each environment has its own `SOCKET_CORS_ORIGIN` configured in the kustomize overlay:
+
+| Environment | SOCKET_CORS_ORIGIN |
+|-------------|-------------------|
+| DEV | `https://dev.gcp.bloomhealth.us` |
+| QA | `https://qa.gcp.bloomhealth.us` |
+| PROD | `https://bloomhealth.us` |
+
+### Session Affinity
+
+WebSocket connections require session affinity to maintain persistent connections:
+- **Service**: Uses `sessionAffinity: ClientIP` with 1-hour timeout
+- **BackendConfig**: Configures GKE load balancer for CLIENT_IP affinity
+- **Connection Timeout**: 24 hours for long-lived WebSocket connections
 
 ## Grafana Dashboards
 
@@ -67,14 +113,26 @@ Grafana is configured with anonymous access for embedded dashboard panels.
 ### Manual Deployment
 
 ```bash
-# Connect to cluster
-gcloud container clusters get-credentials <cluster-name> --zone <zone>
+# Connect to DEV cluster (Autopilot)
+gcloud container clusters get-credentials bloom-dev-autopilot --region us-west1
+
+# Connect to QA cluster (Standard)
+gcloud container clusters get-credentials bloom-qa-cluster --region us-central1
+
+# Connect to PROD cluster (Autopilot)
+gcloud container clusters get-credentials bloom-prod-autopilot --region us-east1
 
 # Deploy using kustomize
 kubectl apply -k k8s/overlays/<env>
 
 # Or build and apply
 kustomize build k8s/overlays/<env> | kubectl apply -f -
+
+# Force image update and rollout
+kubectl set image deployment/bloom-app -n bloom-<env> app=<new-image>
+kubectl set image deployment/bloom-socket -n bloom-<env> socket=<new-image>
+kubectl rollout restart deployment/bloom-app -n bloom-<env>
+kubectl rollout restart deployment/bloom-socket -n bloom-<env>
 ```
 
 ### CI/CD
@@ -82,6 +140,26 @@ kustomize build k8s/overlays/<env> | kubectl apply -f -
 Deployments are automated via GitHub Actions:
 - **QA**: Push to `qa` branch triggers `.github/workflows/deploy-qa.yml`
 - **PROD**: Push to `main` branch triggers `.github/workflows/deploy-prod.yml`
+
+### Building Docker Images
+
+Images are stored in Google Artifact Registry:
+
+```bash
+# Registry location
+REGISTRY=us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images
+
+# Build and push App image
+docker buildx build --platform linux/amd64 -t $REGISTRY/bloom-app:<env>-latest --push .
+
+# Build and push Socket image
+docker buildx build --platform linux/amd64 -t $REGISTRY/bloom-socket:<env>-latest -f Dockerfile.socket --push .
+
+# Build and push DB-Init image
+docker buildx build --platform linux/amd64 -t $REGISTRY/bloom-db-init:<env>-latest -f Dockerfile.db-init --push .
+```
+
+> **Note**: Use `--platform linux/amd64` when building on Apple Silicon (M1/M2/M3) Macs.
 
 ## Promtail Configuration
 
@@ -152,6 +230,55 @@ If Promtail shows "0/0 ready" targets:
 3. Check positions file:
    ```bash
    kubectl exec -n bloom-<env> <promtail-pod> -- cat /tmp/positions.yaml
+   ```
+
+## Troubleshooting Socket/WebSocket
+
+### Typing Indicator Not Working
+
+1. Check socket pod logs for Redis connection:
+   ```bash
+   kubectl logs -n bloom-<env> -l app=bloom-socket --tail=50 | grep Redis
+   ```
+
+   You should see:
+   ```
+   [Redis] Publisher connected to: redis://redis:6379
+   [Redis] Publisher ready
+   [Redis] Subscribed to pattern: typing:*, total subscriptions: 1
+   ```
+
+2. Check CORS configuration:
+   ```bash
+   kubectl get deployment bloom-socket -n bloom-<env> -o jsonpath='{.spec.template.spec.containers[0].env}' | jq
+   ```
+
+   Verify `SOCKET_CORS_ORIGIN` matches the domain.
+
+3. Test Redis pub/sub manually:
+   ```bash
+   # Get redis pod
+   REDIS_POD=$(kubectl get pods -n bloom-<env> -l app=redis -o jsonpath='{.items[0].metadata.name}')
+
+   # Subscribe to typing events
+   kubectl exec -n bloom-<env> $REDIS_POD -- redis-cli PSUBSCRIBE "typing:*"
+   ```
+
+### WebSocket Connection Failures
+
+1. Check BackendConfig is applied:
+   ```bash
+   kubectl get backendconfig bloom-socket-backend-config -n bloom-<env>
+   ```
+
+2. Verify session affinity:
+   ```bash
+   kubectl get svc bloom-socket -n bloom-<env> -o yaml | grep -A5 sessionAffinity
+   ```
+
+3. Check ingress annotations for WebSocket support:
+   ```bash
+   kubectl get ingress bloom-ingress -n bloom-<env> -o yaml | grep -A10 annotations
    ```
 
 ## Secrets

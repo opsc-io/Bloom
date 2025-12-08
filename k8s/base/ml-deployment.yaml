@@ -1,0 +1,155 @@
+# ML Inference Service Deployment
+# Mental Health Multi-Task Model for Bloom Chat Integration
+#
+# Model: XLM-RoBERTa Large with 5 prediction heads
+# - Sentiment (regression: -1 to 1)
+# - Family history (binary classification)
+# - Trauma indicators (regression: 0-7)
+# - Social isolation (regression: 0-4)
+# - Support system strength (regression)
+#
+# Endpoints:
+# - GET  /health        - Health check
+# - POST /predict       - Single text prediction
+# - POST /predict/batch - Batch prediction
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ml-inference
+  labels:
+    app: ml-inference
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ml-inference
+  template:
+    metadata:
+      labels:
+        app: ml-inference
+    spec:
+      serviceAccountName: bloom-sa
+
+      # Init container to download model from GCS
+      initContainers:
+        - name: model-downloader
+          image: google/cloud-sdk:slim
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Downloading model from GCS..."
+              gsutil -m cp -r gs://bloom-health-ml-models/latest/* /model/
+              echo "Model downloaded successfully"
+              ls -la /model/
+          volumeMounts:
+            - name: model-volume
+              mountPath: /model
+
+      containers:
+        - name: ml-inference
+          image: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/ml-inference:latest
+          ports:
+            - containerPort: 8080
+          env:
+            # Model configuration
+            - name: MODEL_DIR
+              value: "/model"
+            - name: MODEL_NAME
+              value: "xlm-roberta-large"
+            # HuggingFace cache for base model weights
+            - name: HF_HOME
+              value: "/cache/huggingface"
+            - name: TRANSFORMERS_CACHE
+              value: "/cache/huggingface"
+            # Disable tokenizer parallelism warning
+            - name: TOKENIZERS_PARALLELISM
+              value: "false"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "4Gi"
+            limits:
+              cpu: "2000m"
+              memory: "8Gi"
+              # GPU resources for Autopilot (uncomment if GPU needed)
+              # nvidia.com/gpu: "1"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 10
+          volumeMounts:
+            - name: model-volume
+              mountPath: /model
+            - name: cache-volume
+              mountPath: /cache
+      volumes:
+        - name: model-volume
+          emptyDir:
+            sizeLimit: 5Gi
+        - name: cache-volume
+          emptyDir:
+            sizeLimit: 10Gi
+      # Node selector for GPU nodes (if using dedicated GPU pool)
+      # nodeSelector:
+      #   cloud.google.com/gke-accelerator: nvidia-tesla-t4
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ml-inference
+spec:
+  selector:
+    app: ml-inference
+  ports:
+    - port: 8080
+      targetPort: 8080
+  type: ClusterIP
+---
+# HorizontalPodAutoscaler for ML Inference
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: ml-inference-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: ml-inference
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+---
+# PodDisruptionBudget for availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: ml-inference-pdb
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: ml-inference

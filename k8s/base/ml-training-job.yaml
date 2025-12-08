@@ -1,0 +1,153 @@
+# ML Training Job
+# Runs the multi-task mental health model training on GKE with GPU
+#
+# Usage:
+#   kubectl apply -f ml-training-job.yaml -n bloom-<env>
+#
+# The job will:
+# 1. Download the phoenix1803/Mental-Health-LongParas dataset
+# 2. Train XLM-RoBERTa Large with 5 prediction heads
+# 3. Upload trained model to GCS bucket
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ml-training
+  labels:
+    app: ml-training
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400  # Cleanup after 24 hours
+  template:
+    metadata:
+      labels:
+        app: ml-training
+    spec:
+      restartPolicy: OnFailure
+
+      # Service account for GCS access
+      serviceAccountName: bloom-sa
+
+      containers:
+        - name: trainer
+          image: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/ml-training:latest
+
+          args:
+            - "--epochs"
+            - "2"
+            - "--batch-size"
+            - "32"
+            - "--learning-rate"
+            - "2e-5"
+            - "--output-dir"
+            - "/output"
+            - "--gcs-bucket"
+            - "gs://bloom-health-ml-models"
+
+          env:
+            # HuggingFace cache directory
+            - name: HF_HOME
+              value: "/cache/huggingface"
+            - name: TRANSFORMERS_CACHE
+              value: "/cache/huggingface"
+            # Disable tokenizer parallelism warning
+            - name: TOKENIZERS_PARALLELISM
+              value: "false"
+
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+              nvidia.com/gpu: "1"
+
+          volumeMounts:
+            - name: output-volume
+              mountPath: /output
+            - name: cache-volume
+              mountPath: /cache
+
+      # GPU node selector for GKE
+      nodeSelector:
+        cloud.google.com/gke-accelerator: nvidia-tesla-t4
+
+      tolerations:
+        - key: "nvidia.com/gpu"
+          operator: "Exists"
+          effect: "NoSchedule"
+
+      volumes:
+        - name: output-volume
+          emptyDir:
+            sizeLimit: 10Gi
+        - name: cache-volume
+          emptyDir:
+            sizeLimit: 20Gi
+---
+# Alternative: Training Job for GKE Autopilot (no GPU)
+# Use this for dev/testing or when GPUs aren't available
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ml-training-cpu
+  labels:
+    app: ml-training
+spec:
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 86400
+  template:
+    metadata:
+      labels:
+        app: ml-training
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: bloom-sa
+
+      containers:
+        - name: trainer
+          image: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/ml-training:latest
+
+          args:
+            - "--epochs"
+            - "1"  # Fewer epochs for CPU
+            - "--batch-size"
+            - "8"  # Smaller batch for CPU
+            - "--learning-rate"
+            - "2e-5"
+            - "--output-dir"
+            - "/output"
+            - "--gcs-bucket"
+            - "gs://bloom-health-ml-models"
+
+          env:
+            - name: HF_HOME
+              value: "/cache/huggingface"
+            - name: TRANSFORMERS_CACHE
+              value: "/cache/huggingface"
+            - name: TOKENIZERS_PARALLELISM
+              value: "false"
+
+          resources:
+            requests:
+              cpu: "4"
+              memory: "16Gi"
+            limits:
+              cpu: "8"
+              memory: "32Gi"
+
+          volumeMounts:
+            - name: output-volume
+              mountPath: /output
+            - name: cache-volume
+              mountPath: /cache
+
+      volumes:
+        - name: output-volume
+          emptyDir:
+            sizeLimit: 10Gi
+        - name: cache-volume
+          emptyDir:
+            sizeLimit: 20Gi

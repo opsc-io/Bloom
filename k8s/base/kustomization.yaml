@@ -13,6 +13,7 @@ resources:
   - db-init-job.yaml
   - app-deployment.yaml
   - socket-deployment.yaml
+  - ml-deployment.yaml
   - monitoring-stack.yaml
   - ingress.yaml
 
