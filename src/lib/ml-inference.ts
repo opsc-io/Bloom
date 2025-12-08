@@ -142,6 +142,64 @@ function mockAnalyzeText(text: string): PredictionResult {
 }
 
 /**
+ * Determine label from psychometric scores
+ * This provides client-side label determination based on the actual model output ranges
+ */
+function determineLabelFromPsychometrics(
+  psychometrics: PsychometricProfile
+): { label: MentalHealthLabel; confidence: number } {
+  const { sentiment, trauma, isolation, support } = psychometrics;
+
+  // Very negative sentiment with any trauma indicator suggests serious conditions
+  if (sentiment < -0.5) {
+    if (trauma > 0.6 || isolation > 0.5) {
+      return { label: "Suicidal", confidence: Math.min(0.95, 0.7 + Math.abs(sentiment) * 0.2) };
+    }
+    return { label: "Depression", confidence: Math.min(0.90, 0.6 + Math.abs(sentiment) * 0.3) };
+  }
+
+  // Moderately negative sentiment
+  if (sentiment < -0.2) {
+    if (trauma > 0.5 && isolation > 0.4) {
+      return { label: "Depression", confidence: Math.min(0.85, 0.5 + trauma * 0.3) };
+    }
+    if (trauma > 0.4 || isolation > 0.4) {
+      return { label: "Anxiety", confidence: Math.min(0.85, 0.5 + trauma * 0.3) };
+    }
+    return { label: "Stress", confidence: Math.min(0.80, 0.5 + isolation * 0.4) };
+  }
+
+  // Slightly negative sentiment (mild stress/anxiety)
+  if (sentiment < 0) {
+    if (trauma > 0.5 || isolation > 0.5) {
+      return { label: "Anxiety", confidence: Math.min(0.75, 0.45 + trauma * 0.3) };
+    }
+    return { label: "Stress", confidence: Math.min(0.70, 0.4 + isolation * 0.4) };
+  }
+
+  // Positive sentiment - check if it's genuine or masking
+  if (sentiment > 0.3) {
+    // High positive sentiment with low trauma/isolation = Normal
+    if (trauma < 0.4 && isolation < 0.4) {
+      return { label: "Normal", confidence: Math.min(0.90, 0.6 + sentiment * 0.3) };
+    }
+    // Positive sentiment but elevated trauma could be bipolar or masking
+    if (trauma > 0.5) {
+      return { label: "Bipolar", confidence: Math.min(0.70, 0.4 + trauma * 0.3) };
+    }
+    return { label: "Normal", confidence: Math.min(0.80, 0.5 + sentiment * 0.3) };
+  }
+
+  // Neutral sentiment (0 to 0.3) - depends on other factors
+  if (trauma > 0.5 || isolation > 0.5) {
+    return { label: "Stress", confidence: Math.min(0.75, 0.4 + trauma * 0.3) };
+  }
+
+  // Default to Normal for neutral/positive with low indicators
+  return { label: "Normal", confidence: Math.min(0.70, 0.5 + sentiment * 0.2) };
+}
+
+/**
  * Call Vertex AI Endpoint for prediction
  */
 async function callVertexAI(text: string): Promise<PredictionResult> {
@@ -167,17 +225,31 @@ async function callVertexAI(text: string): Promise<PredictionResult> {
   const data = await response.json();
   const prediction = data.predictions?.[0]?.prediction || data.predictions?.[0];
 
+  // Extract psychometrics
+  const psychometrics: PsychometricProfile | undefined = prediction.psychometrics ? {
+    sentiment: prediction.psychometrics.sentiment,
+    trauma: prediction.psychometrics.trauma,
+    isolation: prediction.psychometrics.isolation,
+    support: prediction.psychometrics.support,
+    familyHistoryProb: prediction.psychometrics.family_history_prob,
+  } : undefined;
+
+  // Re-calculate label from psychometrics (client-side) for better accuracy
+  let label = prediction.label as MentalHealthLabel;
+  let confidence = prediction.confidence;
+
+  if (psychometrics) {
+    const recalculated = determineLabelFromPsychometrics(psychometrics);
+    label = recalculated.label;
+    confidence = recalculated.confidence;
+    console.log(`[ML] Recalculated label: ${label} (was: ${prediction.label}), confidence: ${confidence.toFixed(2)}`);
+  }
+
   return {
-    label: prediction.label as MentalHealthLabel,
-    confidence: prediction.confidence,
-    riskLevel: prediction.risk_level || getRiskLevelFromPrediction(prediction.label, prediction.confidence),
-    psychometrics: prediction.psychometrics ? {
-      sentiment: prediction.psychometrics.sentiment,
-      trauma: prediction.psychometrics.trauma,
-      isolation: prediction.psychometrics.isolation,
-      support: prediction.psychometrics.support,
-      familyHistoryProb: prediction.psychometrics.family_history_prob,
-    } : undefined,
+    label,
+    confidence,
+    riskLevel: getRiskLevelFromPrediction(label, confidence),
+    psychometrics,
     allScores: prediction.all_scores,
   };
 }

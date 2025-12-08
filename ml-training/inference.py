@@ -92,32 +92,60 @@ def determine_label(psychometrics: Dict[str, float]) -> tuple:
     """
     Determine primary mental health label from psychometric scores.
 
+    The model outputs approximate ranges:
+    - sentiment: -1 to 1 (negative = negative sentiment)
+    - trauma: 0 to 7 (but typically outputs 0.3-0.8)
+    - isolation: 0 to 4 (but typically outputs 0.2-0.7)
+    - support: 0 to 1 (scaled from 0-100)
+    - family_history_prob: 0 to 1
+
     Returns:
         Tuple of (label, confidence)
     """
     sentiment = psychometrics['sentiment']
     trauma = psychometrics['trauma']
     isolation = psychometrics['isolation']
+    support = psychometrics.get('support', 0.5)
     family_prob = psychometrics['family_history_prob']
 
-    # High trauma + high isolation suggests Depression or Suicidal
-    if trauma > 4 and isolation > 2:
-        if sentiment < -0.5:
-            return "Suicidal", min(0.95, 0.6 + trauma * 0.05)
-        return "Depression", min(0.95, 0.5 + trauma * 0.05)
+    # Adjusted thresholds based on actual model output ranges
 
-    # Moderate trauma/isolation suggests Anxiety or Stress
-    if trauma > 2 or isolation > 1.5:
-        if sentiment < -0.3:
-            return "Anxiety", min(0.90, 0.5 + trauma * 0.05)
-        return "Stress", min(0.85, 0.5 + isolation * 0.1)
+    # Very negative sentiment with any trauma indicator suggests serious conditions
+    if sentiment < -0.5:
+        if trauma > 0.6 or isolation > 0.5:
+            return "Suicidal", min(0.95, 0.7 + abs(sentiment) * 0.2)
+        return "Depression", min(0.90, 0.6 + abs(sentiment) * 0.3)
 
-    # Low indicators suggest Normal or mild conditions
-    if sentiment > 0 and trauma < 1 and isolation < 1:
-        return "Normal", min(0.90, 0.7 + sentiment * 0.2)
+    # Moderately negative sentiment
+    if sentiment < -0.2:
+        if trauma > 0.5 and isolation > 0.4:
+            return "Depression", min(0.85, 0.5 + trauma * 0.3)
+        if trauma > 0.4 or isolation > 0.4:
+            return "Anxiety", min(0.85, 0.5 + trauma * 0.3)
+        return "Stress", min(0.80, 0.5 + isolation * 0.4)
 
-    # Default to Stress for ambiguous cases
-    return "Stress", 0.5
+    # Slightly negative sentiment (mild stress/anxiety)
+    if sentiment < 0:
+        if trauma > 0.5 or isolation > 0.5:
+            return "Anxiety", min(0.75, 0.45 + trauma * 0.3)
+        return "Stress", min(0.70, 0.4 + isolation * 0.4)
+
+    # Positive sentiment - check if it's genuine or masking
+    if sentiment > 0.3:
+        # High positive sentiment with low trauma/isolation = Normal
+        if trauma < 0.4 and isolation < 0.4:
+            return "Normal", min(0.90, 0.6 + sentiment * 0.3)
+        # Positive sentiment but elevated trauma could be bipolar or masking
+        if trauma > 0.5:
+            return "Bipolar", min(0.70, 0.4 + trauma * 0.3)
+        return "Normal", min(0.80, 0.5 + sentiment * 0.3)
+
+    # Neutral sentiment (0 to 0.3) - depends on other factors
+    if trauma > 0.5 or isolation > 0.5:
+        return "Stress", min(0.75, 0.4 + trauma * 0.3)
+
+    # Default to Normal for neutral/positive with low indicators
+    return "Normal", min(0.70, 0.5 + sentiment * 0.2)
 
 
 def get_risk_level(label: str, confidence: float) -> str:
