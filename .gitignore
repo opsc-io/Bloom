@@ -44,3 +44,11 @@ next-env.d.ts
 
 /src/generated/prisma
 .env*.local
+
+# ML training artifacts
+ml-training/trained_model/
+ml-training/__pycache__/
+*.pt
+*.pth
+*.ckpt
+wandb/

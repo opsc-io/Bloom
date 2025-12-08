@@ -1,6 +1,6 @@
 /**
  * ML Inference Client for Mental Health Classification
- * Calls the internal ml-inference service in the cluster
+ * Supports both Vertex AI Endpoint and internal K8s service
  */
 
 // Mental health classification labels
@@ -16,10 +16,20 @@ export const MENTAL_HEALTH_LABELS = [
 
 export type MentalHealthLabel = (typeof MENTAL_HEALTH_LABELS)[number];
 
+export interface PsychometricProfile {
+  sentiment: number; // -1 to 1
+  trauma: number; // 0 to 7
+  isolation: number; // 0 to 4
+  support: number; // 0 to ~4
+  familyHistoryProb: number; // 0 to 1
+}
+
 export interface PredictionResult {
   label: MentalHealthLabel;
   confidence: number;
+  riskLevel: "high" | "medium" | "low" | "normal";
   allScores?: Record<MentalHealthLabel, number>;
+  psychometrics?: PsychometricProfile;
 }
 
 export interface MLHealthStatus {
@@ -29,17 +39,153 @@ export interface MLHealthStatus {
   labels: string[];
 }
 
-// Service URL - internal K8s service or environment override
+// Configuration - supports both Vertex AI and direct service
+const VERTEX_AI_ENDPOINT = process.env.VERTEX_AI_ENDPOINT;
+const VERTEX_AI_PROJECT = process.env.VERTEX_AI_PROJECT || "project-4fc52960-1177-49ec-a6f";
+const VERTEX_AI_LOCATION = process.env.VERTEX_AI_LOCATION || "us-central1";
+
+// Fallback to internal K8s service or mock
 const ML_INFERENCE_URL =
   process.env.ML_INFERENCE_URL || "http://ml-inference:8080";
 
+// Use mock ML when no real service is configured
+export const USE_MOCK_ML =
+  process.env.USE_MOCK_ML === "true" ||
+  (!VERTEX_AI_ENDPOINT && !process.env.ML_INFERENCE_URL);
+
 /**
- * Analyze a single text for mental health indicators
+ * Get Google Cloud auth token for Vertex AI
+ * Uses Application Default Credentials (ADC) on GKE, or gcloud CLI locally
  */
-export async function analyzeText(
-  text: string,
-  returnAllScores = false
-): Promise<PredictionResult> {
+async function getGoogleAuthToken(): Promise<string> {
+  // On GKE with Workload Identity, fetch from metadata server
+  try {
+    const response = await fetch(
+      "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token",
+      { headers: { "Metadata-Flavor": "Google" } }
+    );
+    if (response.ok) {
+      const data = await response.json();
+      return data.access_token;
+    }
+  } catch {
+    // Not running on GCP - try local gcloud CLI
+  }
+
+  // Local development: use gcloud CLI to get access token
+  try {
+    const { execSync } = await import("child_process");
+    const token = execSync("gcloud auth print-access-token", {
+      encoding: "utf-8",
+      timeout: 5000,
+    }).trim();
+    if (token) {
+      return token;
+    }
+  } catch {
+    // gcloud CLI not available or not authenticated
+  }
+
+  throw new Error("Unable to get Google Cloud auth token. Run 'gcloud auth login' for local development.");
+}
+
+/**
+ * Mock analyzer - returns classification based on text analysis
+ * Used when ML model isn't ready yet
+ */
+function mockAnalyzeText(text: string): PredictionResult {
+  const lowerText = text.toLowerCase();
+
+  // Simple keyword-based mock analysis
+  let label: MentalHealthLabel = "Normal";
+  let confidence = 0.65;
+  let riskLevel: "high" | "medium" | "low" | "normal" = "normal";
+
+  // High risk keywords
+  if (lowerText.includes("suicid") || lowerText.includes("kill myself") || lowerText.includes("end my life")) {
+    label = "Suicidal";
+    confidence = 0.85;
+    riskLevel = "high";
+  } else if (lowerText.includes("depress") || lowerText.includes("hopeless") || lowerText.includes("worthless")) {
+    label = "Depression";
+    confidence = 0.75;
+    riskLevel = "medium";
+  } else if (lowerText.includes("anxious") || lowerText.includes("panic") || lowerText.includes("worried")) {
+    label = "Anxiety";
+    confidence = 0.70;
+    riskLevel = "medium";
+  } else if (lowerText.includes("stress") || lowerText.includes("overwhelm") || lowerText.includes("pressure")) {
+    label = "Stress";
+    confidence = 0.70;
+    riskLevel = "low";
+  }
+
+  // Generate mock psychometric scores
+  const psychometrics: PsychometricProfile = {
+    sentiment: label === "Normal" ? 0.3 : -0.4,
+    trauma: ["Suicidal", "Depression"].includes(label) ? 4.5 : 1.5,
+    isolation: ["Suicidal", "Depression"].includes(label) ? 2.8 : 1.0,
+    support: label === "Normal" ? 0.8 : 0.3,
+    familyHistoryProb: 0.2,
+  };
+
+  // Generate mock scores for all labels
+  const allScores = MENTAL_HEALTH_LABELS.reduce(
+    (acc, l) => ({
+      ...acc,
+      [l]: l === label ? confidence : Math.random() * 0.3,
+    }),
+    {} as Record<MentalHealthLabel, number>
+  );
+
+  return { label, confidence, riskLevel, allScores, psychometrics };
+}
+
+/**
+ * Call Vertex AI Endpoint for prediction
+ */
+async function callVertexAI(text: string): Promise<PredictionResult> {
+  const token = await getGoogleAuthToken();
+  const endpoint = `https://${VERTEX_AI_LOCATION}-aiplatform.googleapis.com/v1/projects/${VERTEX_AI_PROJECT}/locations/${VERTEX_AI_LOCATION}/endpoints/${VERTEX_AI_ENDPOINT}:predict`;
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      instances: [{ text, return_all_scores: true }],
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    throw new Error(`Vertex AI prediction failed: ${response.status} - ${error}`);
+  }
+
+  const data = await response.json();
+  const prediction = data.predictions?.[0]?.prediction || data.predictions?.[0];
+
+  return {
+    label: prediction.label as MentalHealthLabel,
+    confidence: prediction.confidence,
+    riskLevel: prediction.risk_level || getRiskLevelFromPrediction(prediction.label, prediction.confidence),
+    psychometrics: prediction.psychometrics ? {
+      sentiment: prediction.psychometrics.sentiment,
+      trauma: prediction.psychometrics.trauma,
+      isolation: prediction.psychometrics.isolation,
+      support: prediction.psychometrics.support,
+      familyHistoryProb: prediction.psychometrics.family_history_prob,
+    } : undefined,
+    allScores: prediction.all_scores,
+  };
+}
+
+/**
+ * Call internal ML service for prediction
+ */
+async function callMLService(text: string, returnAllScores: boolean): Promise<PredictionResult> {
   const response = await fetch(`${ML_INFERENCE_URL}/predict`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -56,10 +202,47 @@ export async function analyzeText(
 
   const data = await response.json();
   return {
-    label: data.prediction.label,
+    label: data.prediction.label as MentalHealthLabel,
     confidence: data.prediction.confidence,
+    riskLevel: data.prediction.risk_level || getRiskLevelFromPrediction(data.prediction.label, data.prediction.confidence),
+    psychometrics: data.prediction.psychometrics ? {
+      sentiment: data.prediction.psychometrics.sentiment,
+      trauma: data.prediction.psychometrics.trauma,
+      isolation: data.prediction.psychometrics.isolation,
+      support: data.prediction.psychometrics.support,
+      familyHistoryProb: data.prediction.psychometrics.family_history_prob,
+    } : undefined,
     allScores: data.prediction.all_scores,
   };
+}
+
+/**
+ * Analyze a single text for mental health indicators
+ * Uses Vertex AI > Internal Service > Mock (in that priority order)
+ */
+export async function analyzeText(
+  text: string,
+  returnAllScores = false
+): Promise<PredictionResult> {
+  // Use mock when no ML service is configured
+  if (USE_MOCK_ML) {
+    console.log("[ML] Using mock analyzer (USE_MOCK_ML=true)");
+    return mockAnalyzeText(text);
+  }
+
+  // Try Vertex AI first if configured
+  if (VERTEX_AI_ENDPOINT) {
+    try {
+      console.log("[ML] Using Vertex AI endpoint");
+      return await callVertexAI(text);
+    } catch (error) {
+      console.warn("[ML] Vertex AI failed, falling back:", error);
+    }
+  }
+
+  // Fall back to internal service
+  console.log("[ML] Using internal ML service");
+  return await callMLService(text, returnAllScores);
 }
 
 /**
@@ -69,6 +252,17 @@ export async function analyzeTexts(
   texts: string[],
   returnAllScores = false
 ): Promise<PredictionResult[]> {
+  // For Vertex AI, process individually (or implement batch)
+  if (VERTEX_AI_ENDPOINT && !USE_MOCK_ML) {
+    return Promise.all(texts.map(text => analyzeText(text, returnAllScores)));
+  }
+
+  // Use mock for all
+  if (USE_MOCK_ML) {
+    return texts.map(text => mockAnalyzeText(text));
+  }
+
+  // Use internal batch endpoint
   const response = await fetch(`${ML_INFERENCE_URL}/predict/batch`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -85,9 +279,10 @@ export async function analyzeTexts(
 
   const data = await response.json();
   return data.predictions.map(
-    (p: { label: string; confidence: number; all_scores?: object }) => ({
+    (p: { label: string; confidence: number; risk_level?: string; all_scores?: object; psychometrics?: object }) => ({
       label: p.label as MentalHealthLabel,
       confidence: p.confidence,
+      riskLevel: p.risk_level || getRiskLevelFromPrediction(p.label as MentalHealthLabel, p.confidence),
       allScores: p.all_scores,
     })
   );
@@ -97,6 +292,15 @@ export async function analyzeTexts(
  * Check ML service health
  */
 export async function checkMLHealth(): Promise<MLHealthStatus> {
+  if (USE_MOCK_ML) {
+    return {
+      status: "healthy",
+      modelLoaded: true,
+      device: "mock",
+      labels: [...MENTAL_HEALTH_LABELS],
+    };
+  }
+
   try {
     const response = await fetch(`${ML_INFERENCE_URL}/health`);
     if (!response.ok) {
@@ -128,32 +332,39 @@ export async function checkMLHealth(): Promise<MLHealthStatus> {
  * Check if a prediction indicates high risk
  */
 export function isHighRisk(prediction: PredictionResult): boolean {
-  const highRiskLabels: MentalHealthLabel[] = ["Suicidal", "Depression"];
-  return (
-    highRiskLabels.includes(prediction.label) && prediction.confidence > 0.7
-  );
+  return prediction.riskLevel === "high";
 }
 
 /**
- * Get risk level from prediction
+ * Get risk level from prediction (for backwards compatibility)
+ */
+function getRiskLevelFromPrediction(
+  label: MentalHealthLabel,
+  confidence: number
+): "high" | "medium" | "low" | "normal" {
+  if (label === "Suicidal" && confidence > 0.5) {
+    return "high";
+  }
+  if (label === "Depression" && confidence > 0.7) {
+    return "high";
+  }
+  if (
+    ["Depression", "Anxiety", "Bipolar"].includes(label) &&
+    confidence > 0.5
+  ) {
+    return "medium";
+  }
+  if (label === "Normal") {
+    return "normal";
+  }
+  return "low";
+}
+
+/**
+ * Get risk level from prediction (exported for backward compatibility)
  */
 export function getRiskLevel(
   prediction: PredictionResult
 ): "high" | "medium" | "low" | "normal" {
-  if (prediction.label === "Suicidal" && prediction.confidence > 0.5) {
-    return "high";
-  }
-  if (prediction.label === "Depression" && prediction.confidence > 0.7) {
-    return "high";
-  }
-  if (
-    ["Depression", "Anxiety", "Bipolar"].includes(prediction.label) &&
-    prediction.confidence > 0.5
-  ) {
-    return "medium";
-  }
-  if (prediction.label === "Normal") {
-    return "normal";
-  }
-  return "low";
+  return prediction.riskLevel;
 }

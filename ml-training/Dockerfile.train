@@ -1,0 +1,31 @@
+# ML Training Dockerfile for Vertex AI
+# Uses PyTorch with CUDA for GPU training
+
+FROM pytorch/pytorch:2.1.0-cuda12.1-cudnn8-runtime
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy training code
+COPY dataset.py .
+COPY model.py .
+COPY train.py .
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV HF_HOME=/tmp/huggingface
+ENV TRANSFORMERS_CACHE=/tmp/huggingface
+ENV TOKENIZERS_PARALLELISM=false
+
+# Vertex AI expects the training script to be executable
+ENTRYPOINT ["python", "train.py"]
+CMD ["--epochs", "5", "--batch-size", "32", "--learning-rate", "0.001", "--max-length", "256", "--gcs-bucket", "gs://bloom-health-ml-models"]
