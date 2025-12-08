@@ -1,108 +1,170 @@
-DEVELOPMENT
-===========
+# Development Guide
 
-Quick reference for contributors: how to run tests, start local services, and iterate fast.
+Quick reference for contributors: infrastructure overview, environment setup, and deployment.
 
-Prereqs
-- Node 18+ (use nvm to manage versions)
-- Docker (optional) for Postgres/Redis/MinIO stack
+## Infrastructure Overview
 
-Install
--------
-Install dependencies (use CI-friendly install when scripting):
+### Environments
+
+| Environment | Domain | Database | Branch |
+|-------------|--------|----------|--------|
+| Production | bloomhealth.us | CockroachDB (meek-wallaby-10799) | main |
+| QA | qa.bloomhealth.us | CockroachDB (exotic-cuscus-10800) | qa |
+
+### Tech Stack
+
+- **Framework**: Next.js 16 with App Router
+- **Database**: CockroachDB Cloud (PostgreSQL compatible)
+- **ORM**: Prisma with CockroachDB provider
+- **Auth**: Better Auth (email/password + Google OAuth)
+- **Hosting**: Vercel
+- **File Storage**: Vercel Blob
+- **Email**: SMTP2Go (password reset emails)
+- **Observability**: Grafana Cloud
+
+## Prerequisites
+
+- Node 18+
+- npm
+
+## Installation
 
 ```bash
 npm ci
 ```
 
-Run tests
----------
-Run the entire test suite with Vitest:
-
-```bash
-npm run test
-```
-
-Run a single test file (fast feedback):
-
-```bash
-npx vitest run tests/some.spec.ts
-```
-
-Run tests in watch mode while developing:
-
-```bash
-npx vitest --watch
-```
-
-Testing notes
-- The project supports an in-memory SQLite configuration for fast integration tests. Use `NODE_ENV=test` when running tests locally to enable deterministic behaviors for external services (OpenAI moderation, Stripe, Zoom mocks).
-- If tests complain about missing drivers (sqlite3), run `npm ci` to ensure dev deps are installed.
-
-Start the app (development)
----------------------------
-This repo uses Next.js for the web/server routes. For local dev:
+## Local Development
 
 ```bash
 npm run dev
 ```
 
-Realtime server
----------------
-If you have a standalone realtime server (`src/realtime/server.ts`), start it during development with:
+The app runs at http://localhost:3000
+
+## Environment Variables
+
+Required variables for local development (create `.env.local`):
 
 ```bash
-node -r ts-node/register/transpile-only src/realtime/server.ts
+# Database
+DATABASE_URL="postgresql://..."
+
+# Auth
+BETTER_AUTH_SECRET="..." # min 32 chars
+BETTER_AUTH_URL="http://localhost:3000"
+
+# Google OAuth (optional for local)
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
+
+# SMTP (for password reset)
+SMTP_USER="bloomhealth.us"
+SMTP_PASSWORD="..."
+
+# Blob Storage
+BLOB_READ_WRITE_TOKEN="..."
+
+# Grafana (admin dashboard)
+GRAFANA_TOKEN_QA="..."
+GRAFANA_TOKEN_PRODUCTION="..."
 ```
 
-or run the compiled build in Node after `npm run build`.
+## Key Files & APIs
 
-Docker-compose dev stack (optional)
-----------------------------------
-Use the `docker-compose.yml` in the repo (if present) to start Postgres, Redis and MinIO for realistic dev testing. Example:
+### Authentication
+- `src/lib/auth.ts` - Server-side Better Auth config
+- `src/lib/auth-client.ts` - Client-side auth hooks
+- `src/app/api/auth/[...all]/route.ts` - Auth API routes
+
+### File Upload
+- `src/app/api/upload/route.ts` - Blob upload/delete/list API
+- `src/lib/blob.ts` - Client utilities for file uploads
+
+Usage:
+```tsx
+import { uploadFile, deleteFile, listFiles } from '@/lib/blob'
+
+const result = await uploadFile(file, 'avatars')
+console.log(result.url)
+```
+
+### Admin Dashboard
+- `src/app/api/admin/stats/route.ts` - User/session statistics
+- `src/app/api/admin/grafana/route.ts` - Grafana dashboard URL
+- `src/app/dashboard/page.tsx` - Dashboard with admin view
+
+## Database
+
+### Prisma Commands
 
 ```bash
-docker compose up -d
-# then run migrations or start the app
+# Generate client
+npx prisma generate
+
+# Deploy migrations (use on Vercel/CI)
+DATABASE_URL="..." npx prisma migrate deploy
+
+# Create migration (local dev)
+npx prisma migrate dev --name <migration-name>
+
+# View database
+npx prisma studio
 ```
 
-Environment variables
----------------------
-Copy `.env.example` to `.env.local` and fill in credentials for Postgres, Redis, MinIO, Stripe test keys, and other integrations. Key variables:
+### Schema Location
+- `prisma/schema.prisma` - Main schema file
+- `prisma/migrations/` - Migration history
 
-- NODE_ENV=test|development|production
-- DATABASE_URL (or DB_HOST/DB_USER/DB_PASS/DB_NAME)
-- REDIS_URL
-- MINIO_ENDPOINT, MINIO_ACCESS_KEY, MINIO_SECRET_KEY
-- STRIPE_SECRET_KEY (for test mode use test key)
-- NEXTAUTH_SECRET or JWT_SECRET
+## Deployment
 
-Feature branch workflow
------------------------
-1. Create a feature branch from `dev`:
+### Production (main branch)
+Merges to `main` auto-deploy to bloomhealth.us via Vercel.
 
+### QA (qa branch)
+Merges to `qa` auto-deploy to qa.bloomhealth.us via Vercel.
+
+### Manual Deploy
 ```bash
-git checkout dev
-git pull origin dev
-git checkout -b feature/<short-desc>
+# QA
+VERCEL_TOKEN=... vercel --scope opsc --prod=false
+VERCEL_TOKEN=... vercel alias <deployment> qa.bloomhealth.us --scope opsc
+
+# Production
+VERCEL_TOKEN=... vercel --scope opsc --prod
+VERCEL_TOKEN=... vercel alias <deployment> bloomhealth.us --scope opsc
 ```
 
-2. Make small, test-covered commits. Run `npm run test` locally before pushing.
-3. Open a PR from `feature/*` -> `dev`. CI will run tests and block merging when failures occur.
+## Branch Workflow
 
-Testing external integrations locally
------------------------------------
-- Use deterministic test-modes for external integrations. For example, `src/lib/moderation.ts` should expose a deterministic flag when `NODE_ENV=test` so tests don't call external APIs.
-- For payment/Zoom, mock or use provider test modes.
+1. Create feature branch from `main`:
+   ```bash
+   git checkout main
+   git pull origin main
+   git checkout -b feature/<short-desc>
+   ```
 
-Recovering previously removed files
-----------------------------------
-If you need to recover uncommitted or deleted local files, you can inspect the git reflog or the shell history. If you want me to attempt to recover previous local edits, tell me and I will try to restore via reflog or reapply patches on a feature branch.
+2. Make changes, commit with prefixes: `feat:`, `fix:`, `chore:`
 
-Developer tips
---------------
-- Keep commits small and focused. Prefer one behavior change per PR.
-- Add tests for new behaviors; prefer unit tests for services and integration tests for DB + services.
-- Use `NODE_ENV=test` deterministic behaviors to make CI stable.
+3. Open PR to `qa` for testing, then to `main` for production
 
-That's it — pick a task from the README TODOs and I'll implement it on a feature branch. 
+## Vercel Environment Variables
+
+| Variable | Environments | Description |
+|----------|--------------|-------------|
+| DATABASE_URL | All | CockroachDB connection string |
+| BETTER_AUTH_SECRET | All | Auth secret (32+ chars) |
+| BETTER_AUTH_URL | Production/Preview | https://bloomhealth.us or preview URL |
+| GOOGLE_CLIENT_ID | All | Google OAuth client ID |
+| GOOGLE_CLIENT_SECRET | All | Google OAuth client secret |
+| BLOB_READ_WRITE_TOKEN | All | Vercel Blob storage token |
+| SMTP_USER | All | SMTP2Go username |
+| SMTP_PASSWORD | All | SMTP2Go password |
+| GRAFANA_TOKEN_QA | Preview | Grafana service account token for QA |
+| GRAFANA_TOKEN_PRODUCTION | Production | Grafana service account token for production |
+
+## Observability
+
+Grafana Cloud dashboards are embedded in the admin view at `/dashboard` for users with `administrator=true`.
+
+- Production metrics use `GRAFANA_TOKEN_PRODUCTION`
+- QA metrics use `GRAFANA_TOKEN_QA`

@@ -123,7 +123,7 @@ export default function CalendarPage() {
         const data = await res.json();
         if (cancelled) return;
         setConnections(
-          (data.people ?? []).map((p: any) => ({
+          (data.people ?? []).map((p: { id: string; name?: string; email?: string }) => ({
             id: p.id,
             name: p.name ?? p.email ?? "Unknown",
           }))
@@ -199,8 +199,9 @@ export default function CalendarPage() {
       setDate("");
       setStartTime("10:00");
       setDuration(30);
-    } catch (err: any) {
-      setError(err.message || "Unable to create appointment");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to create appointment";
+      setError(message);
     } finally {
       setSaving(false);
     }
@@ -255,8 +256,9 @@ export default function CalendarPage() {
         );
       }
       setSelectedAppointment(null);
-    } catch (err: any) {
-      setEditError(err.message || "Unable to update appointment");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to update appointment";
+      setEditError(message);
     } finally {
       setEditSaving(false);
     }
@@ -289,8 +291,9 @@ export default function CalendarPage() {
         );
       }
       setSelectedAppointment(null);
-    } catch (err: any) {
-      setEditError(err.message || "Unable to cancel appointment");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unable to cancel appointment";
+      setEditError(message);
     } finally {
       setEditSaving(false);
     }

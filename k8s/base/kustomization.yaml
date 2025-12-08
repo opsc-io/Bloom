@@ -16,6 +16,16 @@ resources:
   - monitoring-stack.yaml
   - ingress.yaml
 
+configMapGenerator:
+  - name: grafana-dashboards
+    files:
+      - bloom-overview.json=grafana-dashboards/overview.json
+      - bloom-cockroachdb.json=grafana-dashboards/cockroachdb.json
+      - bloom-containers.json=grafana-dashboards/containers.json
+      - bloom-redis.json=grafana-dashboards/redis.json
+    options:
+      disableNameSuffixHash: true
+
 commonLabels:
   app.kubernetes.io/part-of: bloom-health
   app.kubernetes.io/managed-by: kustomize

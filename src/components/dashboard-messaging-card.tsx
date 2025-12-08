@@ -159,7 +159,7 @@ export function DashboardMessagingCard({ conversations, messages }: DashboardMes
                 <div className="flex items-center gap-3">
                   <Avatar className="h-10 w-10">
                     {conversations.find(c => c.active)?.image && (
-                      <AvatarImage src={conversations.find(c => c.active)?.image!} alt={conversations.find(c => c.active)?.name} />
+                      <AvatarImage src={conversations.find(c => c.active)?.image ?? ''} alt={conversations.find(c => c.active)?.name} />
                     )}
                     <AvatarFallback className={`${conversations.find(c => c.active)?.avatarColor} text-white font-semibold`}>
                       {conversations.find(c => c.active)?.avatar}

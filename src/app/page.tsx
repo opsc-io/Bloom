@@ -318,7 +318,7 @@ export default function Home() {
             </h2>
             
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Join hundreds of therapists and patients who've modernized their practice with Bloom. 
+              Join hundreds of therapists and patients who&apos;ve modernized their practice with Bloom. 
               No credit card required to start.
             </p>
             

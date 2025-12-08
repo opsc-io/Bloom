@@ -109,17 +109,13 @@ function AdminContent() {
 
   useEffect(() => {
     const hostname = window.location.hostname;
-    const isProduction = hostname === 'bloomhealth.us' || hostname === 'www.bloomhealth.us';
-    const isQa = hostname === 'qa.bloomhealth.us';
 
     if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      // Local development - use local Grafana
       setGrafanaUrl('http://localhost:3001/d/bloom-overview/bloom-overview');
-    } else if (isProduction) {
-      setGrafanaUrl('https://opscvisuals.grafana.net/d/bloom-production/bloom-production');
-    } else if (isQa) {
-      setGrafanaUrl('https://opscvisuals.grafana.net/d/bloom-qa/bloom-qa');
     } else {
-      setGrafanaUrl('http://localhost:3001/d/bloom-overview/bloom-overview');
+      // All GKE environments (dev, qa, prod) use local /grafana path
+      setGrafanaUrl('/grafana/d/bloom-overview/bloom-overview');
     }
   }, []);
 

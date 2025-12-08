@@ -22,9 +22,13 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+        env:
+          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
 
       - name: Generate Prisma client
         run: npx prisma generate
+        env:
+          DATABASE_URL: postgresql://dummy:dummy@localhost:5432/dummy
 
       - name: Type check
         run: npx tsc --noEmit
