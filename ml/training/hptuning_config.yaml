@@ -1,0 +1,66 @@
+# Vertex AI Hyperparameter Tuning Configuration
+# For mental health multi-task model
+
+studySpec:
+  metrics:
+    - metricId: val_loss
+      goal: MINIMIZE
+
+  parameters:
+    - parameterId: learning_rate
+      doubleValueSpec:
+        minValue: 1e-6
+        maxValue: 1e-4
+      scaleType: UNIT_LOG_SCALE
+
+    - parameterId: batch_size
+      discreteValueSpec:
+        values:
+          - 8
+          - 16
+          - 32
+          - 64
+
+    - parameterId: epochs
+      discreteValueSpec:
+        values:
+          - 2
+          - 3
+          - 5
+
+    - parameterId: dropout
+      doubleValueSpec:
+        minValue: 0.0
+        maxValue: 0.3
+      scaleType: UNIT_LINEAR_SCALE
+
+    - parameterId: warmup_steps
+      discreteValueSpec:
+        values:
+          - 100
+          - 500
+          - 1000
+
+  algorithm: ALGORITHM_UNSPECIFIED  # Let Vertex AI choose
+
+trialJobSpec:
+  workerPoolSpecs:
+    - machineSpec:
+        machineType: n1-standard-8
+        acceleratorType: NVIDIA_TESLA_T4
+        acceleratorCount: 1
+      replicaCount: 1
+      containerSpec:
+        imageUri: us-docker.pkg.dev/vertex-ai/training/pytorch-gpu.2-0:latest
+        command:
+          - python
+          - ml/training/train.py
+        args:
+          - --train-data=gs://bloom-ml-data/processed/v1/train.parquet
+          - --val-data=gs://bloom-ml-data/processed/v1/val.parquet
+          - --output-dir=/tmp/model
+          - --model-gcs=gs://bloom-ml-models/hpt
+
+maxTrialCount: 20
+parallelTrialCount: 3
+maxFailedTrialCount: 3

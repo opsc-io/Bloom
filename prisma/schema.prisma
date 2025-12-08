@@ -57,6 +57,9 @@ model User {
   supportTicketsCreated  SupportTicket[] @relation("TicketCreator")
   supportTicketsAssigned SupportTicket[] @relation("TicketAssignee")
 
+  // Active Learning feedback
+  mlFeedback MLFeedback[] @relation("TherapistFeedback")
+
   // 2FA fields
   twoFactorEnabled Boolean?    @default(false)
   twofactors       TwoFactor[]
@@ -179,6 +182,7 @@ model Message {
   edited         Boolean             @default(false)
   attachments    MessageAttachment[]
   reactions      MessageReaction[]
+  analysis       MessageAnalysis?
   // delivery receipts can be tracked in Redis for speed; store to DB if you need history
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -214,6 +218,44 @@ model MessageReaction {
   user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId, emoji])
+}
+
+// ML Analysis Results for Messages
+
+model MessageAnalysis {
+  id           String   @id @default(cuid())
+  messageId    String   @unique
+  label        String   // Anxiety, Depression, Suicidal, Stress, Bipolar, Personality disorder, Normal
+  confidence   Float    // 0 to 1 (prediction confidence)
+  riskLevel    String   // "normal", "low", "medium", "high"
+  allScores    Json?    // Optional: full probability distribution across all labels
+  modelVersion String   // Track which model version was used
+  createdAt    DateTime @default(now())
+
+  message  Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  feedback MLFeedback?  // Therapist feedback for active learning
+
+  @@index([label])
+  @@index([riskLevel])
+  @@index([createdAt])
+}
+
+// Active Learning: Therapist feedback on ML predictions
+model MLFeedback {
+  id             String   @id @default(cuid())
+  analysisId     String   @unique
+  therapistId    String
+  isCorrect      Boolean  // Was the ML prediction correct?
+  correctedLabel String?  // If incorrect, what should it be?
+  notes          String?  // Optional notes from therapist
+  createdAt      DateTime @default(now())
+
+  analysis  MessageAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  therapist User            @relation("TherapistFeedback", fields: [therapistId], references: [id], onDelete: Cascade)
+
+  @@index([therapistId])
+  @@index([isCorrect])
+  @@index([createdAt])
 }
 
 // Payments and claims

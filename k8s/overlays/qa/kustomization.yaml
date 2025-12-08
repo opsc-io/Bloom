@@ -27,6 +27,8 @@ images:
   - name: gcr.io/PROJECT_ID/bloom-db-init
     newName: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/bloom-db-init
     newTag: qa-latest
+  - name: us-central1-docker.pkg.dev/project-4fc52960-1177-49ec-a6f/bloom-images/ml-inference
+    newTag: latest
 
 # All patches in a single section
 patches:
@@ -65,6 +67,9 @@ patches:
           limits:
             cpu: "200m"
             memory: "512Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: "https://qa.gcp.bloomhealth.us"
 
   # Redis: Smaller storage
   - target:
@@ -149,3 +154,46 @@ patches:
       - op: replace
         path: /spec/domains/0
         value: qa.gcp.bloomhealth.us
+
+  # Promtail ClusterRoleBinding - QA namespace
+  - target:
+      group: rbac.authorization.k8s.io
+      version: v1
+      kind: ClusterRoleBinding
+      name: promtail
+    patch: |-
+      - op: add
+        path: /subjects/0/namespace
+        value: bloom-qa
+
+  # ML Inference - Minimal resources for QA
+  - target:
+      kind: Deployment
+      name: ml-inference
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 1
+      - op: replace
+        path: /spec/template/spec/containers/0/resources
+        value:
+          requests:
+            cpu: "100m"
+            memory: "1Gi"
+          limits:
+            cpu: "1000m"
+            memory: "2Gi"
+
+  # ML HPA - Single replica for QA
+  - target:
+      group: autoscaling
+      version: v2
+      kind: HorizontalPodAutoscaler
+      name: ml-inference-hpa
+    patch: |-
+      - op: replace
+        path: /spec/minReplicas
+        value: 1
+      - op: replace
+        path: /spec/maxReplicas
+        value: 1

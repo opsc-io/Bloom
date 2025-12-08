@@ -66,6 +66,9 @@ patches:
           limits:
             cpu: "200m"
             memory: "512Mi"
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0/value
+        value: "https://dev.gcp.bloomhealth.us"
 
   # Redis: Smaller storage
   - target:
