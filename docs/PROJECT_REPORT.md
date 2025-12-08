@@ -518,6 +518,37 @@ Development (dev branch) → QA (qa branch) → Production (main branch)
 - 5+ third-party integrations or plugins
 - Documentation viewed by 500+ unique visitors monthly
 
+## Team Contributions
+
+The Bloom platform was developed collaboratively by a cross-functional team, with each member contributing across multiple areas while focusing on their core expertise:
+
+**Samip Niraula**
+- **Primary Focus**: Frontend Development
+- Led UI/UX implementation using Next.js 16 with App Router and shadcn/ui components
+- Developed responsive calendar views, messaging interface, and dashboard pages
+- Implemented client-side state management and real-time WebSocket integration
+- Contributed to API route development and authentication flows
+
+**Bala Anbalagan**
+- **Primary Focus**: Deployment & Backend Infrastructure
+- Architected and implemented Kubernetes deployment strategy using GKE with Kustomize overlays
+- Set up CI/CD pipelines with GitHub Actions for dev, QA, and production environments
+- Configured observability stack (Prometheus, Grafana, Loki, Promtail)
+- Developed backend API routes and database integration with CockroachDB and Redis
+
+**Varad Poddar**
+- **Primary Focus**: Backend & AI/ML Data Modeling
+- Designed and implemented multi-task ML model architecture using XLM-RoBERTa
+- Developed Vertex AI training pipeline and inference service deployment
+- Created data preprocessing pipeline and psychometric scoring logic
+- Contributed to database schema design and Prisma ORM integration
+
+**Collaborative Efforts**
+- All team members participated in architecture decisions, code reviews, and testing
+- Cross-functional pair programming sessions for complex features (WebSocket implementation, ML integration)
+- Shared responsibility for documentation, bug fixes, and performance optimization
+- Joint troubleshooting and debugging of production issues
+
 ## References
 
 - [README.md](../README.md) - Main project documentation with tech stack and features
