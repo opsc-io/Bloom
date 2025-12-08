@@ -6,8 +6,8 @@ on:
 
 env:
   PROJECT_ID: project-4fc52960-1177-49ec-a6f
-  GKE_CLUSTER: bloom-prod-cluster
-  GKE_ZONE: us-central1-a
+  GKE_CLUSTER: bloom-prod-autopilot
+  GKE_REGION: us-east1
   REGISTRY: us-central1-docker.pkg.dev
   REPOSITORY: bloom-images
 
@@ -88,7 +88,7 @@ jobs:
         uses: google-github-actions/get-gke-credentials@v2
         with:
           cluster_name: ${{ env.GKE_CLUSTER }}
-          location: ${{ env.GKE_ZONE }}
+          location: ${{ env.GKE_REGION }}
 
       - name: Fetch secrets from GCP Secret Manager
         run: |
