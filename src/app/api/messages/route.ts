@@ -38,6 +38,12 @@ export async function GET(req: Request) {
   const searchParams = new URL(req.url).searchParams;
   const requestedConversationId = searchParams.get("conversationId");
 
+  // Debug: Check if prisma is defined
+  if (!prisma) {
+    console.error("[Messages API] Prisma client is undefined!");
+    return NextResponse.json({ error: "Database connection error" }, { status: 500 });
+  }
+
   // Fetch conversations with Redis caching
   const conversations = await getCachedOrFetch(
     CACHE_KEYS.userConversations(userId),
@@ -127,18 +133,23 @@ export async function GET(req: Request) {
     }> = new Map();
     if (isTherapist && messages.length > 0) {
       const messageIds = messages.map((m) => m.id);
-      const analyses = await prisma.messageAnalysis.findMany({
-        where: { messageId: { in: messageIds } },
-        select: { messageId: true, label: true, confidence: true, riskLevel: true, psychometrics: true },
-      });
-      analyses.forEach((a) => {
-        analysisMap.set(a.messageId, {
-          label: a.label,
-          confidence: a.confidence,
-          riskLevel: a.riskLevel,
-          psychometrics: a.psychometrics as { sentiment: number; trauma: number; isolation: number; support: number; familyHistoryProb: number } | undefined,
+      
+      try {
+        const analyses = await prisma.messageAnalysis.findMany({
+          where: { messageId: { in: messageIds } },
+          select: { messageId: true, label: true, confidence: true, riskLevel: true, psychometrics: true },
         });
-      });
+        analyses.forEach((a) => {
+          analysisMap.set(a.messageId, {
+            label: a.label,
+            confidence: a.confidence,
+            riskLevel: a.riskLevel,
+            psychometrics: a.psychometrics as { sentiment: number; trauma: number; isolation: number; support: number; familyHistoryProb: number } | undefined,
+          });
+        });
+      } catch (error) {
+        console.error("[Messages API] Error fetching message analysis:", error);
+      }
     }
 
     mappedMessages = messages.map((msg) => {
