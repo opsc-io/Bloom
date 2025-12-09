@@ -11,6 +11,7 @@
 - **Cache**: Redis (self-hosted StatefulSet)
 - **Auth**: Better Auth (Prisma adapter, OAuth, 2FA)
 - **Storage**: Google Cloud Storage (file uploads)
+- **ML/AI**: XLM-RoBERTa Large (mental health classification), Vertex AI Endpoints
 - **Observability**: Prometheus, Grafana, Loki, Promtail
 
 ## Architecture
@@ -95,12 +96,17 @@ Create an open-source platform inspired by Alma and Headway, offering:
 - Test-mode hash override and bcrypt-based hashing for seeded users
 - Dashboard with people, messaging, and calendar cards
 - Messaging API with Redis caching, reactions, and socket publish; messages page UI
+- **ML-powered message analysis** with mental health classification (7 labels) and psychometric scoring
+- **Real-time ML insights** pushed to therapists via WebSocket
+- **Active Learning feedback loop** for therapists to correct ML predictions
 - Appointment CRUD APIs with role-aware access; calendar UI (week offsets)
 - Therapist↔patient assignment model and API (current/past therapist relationships)
 - Admin stats and Grafana proxy endpoints with admin dashboard UI
 - File upload API (GCS/MinIO)
 - People discovery endpoints and pages (available therapists, connections)
 - Seed scripts for admin + Faker users, appointments, conversations, and assignments
+
+> **Documentation**: See [docs/PROJECT_REPORT.md](docs/PROJECT_REPORT.md) for comprehensive architecture, ML pipeline, and deployment details.
 
 ## High-level epics & features
 
@@ -274,7 +280,52 @@ Overall goal: Enable passkeys (WebAuthn) and TOTP for strong, auditable multi-fa
 - [ ] Add dashboard for support ticket metrics (e.g., time to resolution).
 - [ ] Add dashboard for user retention.
 
-## Data & ML roadmap
+## ML/AI Pipeline (Implemented)
+
+### Mental Health Classification Model
+
+Bloom includes a production-ready ML pipeline for analyzing patient messages:
+
+**Model Architecture:**
+- **Base**: XLM-RoBERTa Large (550M parameters)
+- **Classification Labels**: Anxiety, Depression, Suicidal, Stress, Bipolar, Personality Disorder, Normal
+- **Psychometric Outputs**: sentiment (-1 to 1), trauma (0-7), isolation (0-4), support (0-4), family_history_prob (0-1)
+
+**Training Infrastructure:**
+- Vertex AI Custom Jobs with NVIDIA L4 GPUs
+- Mixed precision training (FP16)
+- 3-epoch training on Mental Health Dataset (50K+ samples)
+- Model artifacts stored in GCS (`gs://bloom-ml-models/`)
+
+**Serving:**
+- Vertex AI Endpoint: `7919358942893834240`
+- Auto-scaling: 1-2 replicas based on traffic
+- Inference latency: ~200ms per request
+
+**API Endpoints:**
+```
+POST /api/ml/analyze     - Analyze single message
+POST /api/ml/analyze/batch - Batch analysis
+GET  /api/ml/health      - Check model status
+POST /api/ml/feedback    - Therapist feedback (active learning)
+GET  /api/ml/feedback    - Feedback statistics
+```
+
+**Active Learning:**
+- Therapists can provide feedback on ML predictions
+- Feedback stored in `MLFeedback` table
+- Used for model retraining and improvement
+
+### Load Testing
+
+k6 scripts in `load-tests/` directory:
+- `health-check.js` - API availability tests
+- `api-stress.js` - REST API load testing
+- `websocket-load.js` - WebSocket connection stress tests
+
+Run with: `k6 run load-tests/api-stress.js`
+
+## Data & ML Roadmap
 
 - Use counseling conversation datasets and recent research to build sentiment/engagement models.
 - Train lightweight models to classify transcripts and chat messages for clinician support and outcome prediction.
