@@ -12,7 +12,7 @@
 
 | Name | Primary Focus | Key Contributions |
 |------|---------------|-------------------|
-| **Samip Niraula** | Frontend Development | Next.js 16, shadcn/ui, React components, WebSocket integration, Dashboard UI |
+| **Samip Niraula** | Full Stack & AI/ML | Next.js 16, React components, API routes, ML integration, WebSocket, Dashboard UI |
 | **Bala Anbalagan** | Deployment & Backend | GKE infrastructure, CI/CD pipelines, Observability stack, API routes, CockroachDB |
 | **Varad Poddar** | AI/ML Data Modeling | XLM-RoBERTa model, Vertex AI training, Psychometric scoring, Data preprocessing |
 | **Venkata Rama Gowri Preetam Gunisetty** | Data Science & ML | Model training, Dataset preparation, Feature engineering, Model evaluation |
