@@ -3,8 +3,24 @@
 **Course**: CMPE 255 - Data Mining
 **Project**: Bloom - AI-Powered Therapy Practice Platform
 **Date**: December 8, 2025
-**Repository**: https://github.com/opsc/Bloom
+**Repository**: https://github.com/opsc-io/Bloom
 **Live Demo**: https://bloomhealth.us
+
+---
+
+## Team Members
+
+| Name | Primary Focus | Key Contributions |
+|------|---------------|-------------------|
+| **Samip Niraula** | Frontend Development | Next.js 16, shadcn/ui, React components, WebSocket integration, Dashboard UI |
+| **Bala Anbalagan** | Deployment & Backend | GKE infrastructure, CI/CD pipelines, Observability stack, API routes, CockroachDB |
+| **Varad Poddar** | AI/ML Data Modeling | XLM-RoBERTa model, Vertex AI training, Psychometric scoring, Data preprocessing |
+| **Preetham** | Testing & QA | Load testing, Test automation, Quality assurance, Performance validation |
+
+**Collaborative Efforts:**
+- All team members participated in architecture decisions, code reviews, and testing
+- Cross-functional pair programming for complex features (WebSocket, ML integration)
+- Shared responsibility for documentation, bug fixes, and performance optimization
 
 ---
 
@@ -2126,39 +2142,6 @@ export async function GET(req: Request) {
 - Separate socket server for WebSocket handling
 - Serverless ML inference (Vertex AI)
 - Shared database (CockroachDB)
-
----
-
-## Team Contributions
-
-The Bloom platform was developed collaboratively by a cross-functional team, with each member contributing across multiple areas while focusing on their core expertise:
-
-**Samip Niraula**
-- **Primary Focus**: Frontend Development
-- Led UI/UX implementation using Next.js 16 with App Router and shadcn/ui components
-- Developed responsive calendar views, messaging interface, and dashboard pages
-- Implemented client-side state management and real-time WebSocket integration
-- Contributed to API route development and authentication flows
-
-**Bala Anbalagan**
-- **Primary Focus**: Deployment & Backend Infrastructure
-- Architected and implemented Kubernetes deployment strategy using GKE with Kustomize overlays
-- Set up CI/CD pipelines with GitHub Actions for dev, QA, and production environments
-- Configured observability stack (Prometheus, Grafana, Loki, Promtail)
-- Developed backend API routes and database integration with CockroachDB and Redis
-
-**Varad Poddar**
-- **Primary Focus**: Backend & AI/ML Data Modeling
-- Designed and implemented multi-task ML model architecture using XLM-RoBERTa
-- Developed Vertex AI training pipeline and inference service deployment
-- Created data preprocessing pipeline and psychometric scoring logic
-- Contributed to database schema design and Prisma ORM integration
-
-**Collaborative Efforts**
-- All team members participated in architecture decisions, code reviews, and testing
-- Cross-functional pair programming sessions for complex features (WebSocket implementation, ML integration)
-- Shared responsibility for documentation, bug fixes, and performance optimization
-- Joint troubleshooting and debugging of production issues
 
 ---
 
