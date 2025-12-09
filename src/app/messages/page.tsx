@@ -119,32 +119,79 @@ function MessagesContent() {
     }
   }, [isPending, session, router]);
 
+  // Track if initial load is complete to avoid infinite loops when setting activeConversation
+  const initialLoadDoneRef = React.useRef(false);
+  // Track the last loaded conversation to avoid unnecessary refetches
+  const lastLoadedConversationRef = React.useRef<string | null>(null);
+
   useEffect(() => {
     if (isPending || !session?.user) return;
     let cancelled = false;
 
     const loadMessages = async () => {
       try {
-        const res = await fetch(
-          activeConversation ? `/api/messages?conversationId=${activeConversation}` : "/api/messages"
-        );
+        // Skip if we already loaded this conversation (prevents double-fetch race condition)
+        if (activeConversation && lastLoadedConversationRef.current === activeConversation) {
+          return;
+        }
+
+        // On initial load or when activeConversation changes to a known conversation
+        const url = activeConversation
+          ? `/api/messages?conversationId=${activeConversation}`
+          : "/api/messages";
+
+        const res = await fetch(url);
         if (!res.ok) return;
         const data = await res.json();
         if (cancelled) return;
+
+        // Always update conversations
         setConversations(data.conversations ?? []);
+
+        // Always update messages - trust the API response
+        // The API correctly sets isMe based on senderId === current userId
         setMessages(data.messages ?? []);
 
         const convIds = (data.conversations ?? []).map((c: Conversation) => c.id);
-        if (activeConversation && !convIds.includes(activeConversation)) {
-          setActiveConversation(data.conversations?.[0]?.id ?? null);
-        } else if (!activeConversation) {
-          if (requestedConversationId && convIds.includes(requestedConversationId)) {
-            setActiveConversation(requestedConversationId);
-          } else if (requestedConversationId) {
-            // allow starting a new conversation with a user id from the query param
-            setActiveConversation(requestedConversationId);
-          } else if (data.conversations?.length > 0) {
-            setActiveConversation(data.conversations[0].id);
+
+        // Determine the effective conversation ID from this response
+        // When we fetch without conversationId, API returns messages for first conversation
+        const effectiveConvId = activeConversation ?? data.conversations?.[0]?.id;
+        if (effectiveConvId) {
+          lastLoadedConversationRef.current = effectiveConvId;
+        }
+
+        // Only auto-select conversation on initial load to prevent infinite re-triggering
+        if (!initialLoadDoneRef.current) {
+          initialLoadDoneRef.current = true;
+
+          if (activeConversation && !convIds.includes(activeConversation)) {
+            // Current conversation is invalid, switch to first available
+            const newConvId = data.conversations?.[0]?.id ?? null;
+            if (newConvId && newConvId !== lastLoadedConversationRef.current) {
+              lastLoadedConversationRef.current = null; // Reset so we fetch messages for new conv
+              setActiveConversation(newConvId);
+            } else if (newConvId) {
+              // Already have messages for this conversation, just update active state
+              setActiveConversation(newConvId);
+            }
+          } else if (!activeConversation) {
+            let newConvId: string | null = null;
+            if (requestedConversationId && convIds.includes(requestedConversationId)) {
+              newConvId = requestedConversationId;
+            } else if (requestedConversationId) {
+              // allow starting a new conversation with a user id from the query param
+              newConvId = requestedConversationId;
+            } else if (data.conversations?.length > 0) {
+              newConvId = data.conversations[0].id;
+            }
+            if (newConvId) {
+              // If we already have messages for this conversation, don't reset the ref
+              if (newConvId !== lastLoadedConversationRef.current) {
+                lastLoadedConversationRef.current = null;
+              }
+              setActiveConversation(newConvId);
+            }
           }
         }
 
